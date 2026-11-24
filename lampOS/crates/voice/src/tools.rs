@@ -1790,14 +1790,19 @@ pub fn answer_typed(settings: &Settings, call: &ToolCall, request: u64) -> Value
         Route::Memory(..) if crate::service_records::source::is_tool(&call.name) => {
             json!({"found": false, "reason": crate::service_records::source::NOT_YOURS})
         }
-        Route::Memory(socket, ..) => {
+        Route::Memory(socket, faces, ..) => {
             if crate::remember::is_forget(&call.name) {
                 crate::remember_speaker::forget();
             }
             let began = std::time::Instant::now();
             // A text names no day the lamp heard: a `remember`'s `on` goes (#1693).
             let call = crate::remember::on::call_as_heard(call, None);
-            let (told, answered) = crate::remember::run_for(&socket, &call, ASK_DEADLINE, None);
+            // The face save speaker-bound by the route's switches (#7876).
+            let remember_speaker = faces
+                .as_ref()
+                .is_some_and(|(_, switches)| switches.remember_speaker);
+            let (told, answered) =
+                crate::remember::run_for(&socket, &call, ASK_DEADLINE, None, remember_speaker);
             eprintln!(
                 "lamp-voice second: text request {request} asked for {}; the room's memory {} in {} ms; the answer was sent",
                 call.name,
@@ -2296,6 +2301,11 @@ fn run_call_with_scope(
             if crate::remember::is_forget(&call.name) {
                 crate::remember_speaker::forget();
             }
+            // Whether the face save is speaker-bound, from this route's
+            // switches, never the worker's environment (#7876).
+            let remember_speaker = faces
+                .as_ref()
+                .is_some_and(|(_, switches)| switches.remember_speaker);
             // Any memory call but a forget ends what a bare forget could
             // take as the one-face keep just made ([`ONE_FACE_KEPT`]): after
             // a recall on its line, "that" may be what it read (Thirteen's
@@ -2537,6 +2547,7 @@ fn run_call_with_scope(
                                         deadline.saturating_sub(started.elapsed()),
                                         lease,
                                         &person,
+                                        remember_speaker,
                                     );
                                     match call.args.get("about") {
                                         Some(about) => {
@@ -2605,6 +2616,7 @@ fn run_call_with_scope(
                                     deadline.saturating_sub(started.elapsed()),
                                     lease,
                                     &person,
+                                    remember_speaker,
                                 );
                                 // Only a plain new keep, so it is their newest
                                 // kept thing: one the store had already
@@ -2632,6 +2644,7 @@ fn run_call_with_scope(
                                     deadline.saturating_sub(started.elapsed()),
                                     lease,
                                     &person,
+                                    remember_speaker,
                                 )
                             }
                             (None, None) => crate::remember::run_scoped(
@@ -2639,11 +2652,16 @@ fn run_call_with_scope(
                                 call,
                                 deadline.saturating_sub(started.elapsed()),
                                 lease,
+                                remember_speaker,
                             ),
                         }
                     }
-                    Some(lease) => crate::remember::run_scoped(socket, call, deadline, lease),
-                    None => crate::remember::run_of(socket, call, deadline, request),
+                    Some(lease) => {
+                        crate::remember::run_scoped(socket, call, deadline, lease, remember_speaker)
+                    }
+                    None => {
+                        crate::remember::run_of(socket, call, deadline, request, remember_speaker)
+                    }
                 },
             );
             let told = crate::remember::heard::answered(
@@ -8316,7 +8334,7 @@ mod tests {
             let (told, answered) = if name == crate::remember::FORGET {
                 crate::remember::run_one_face_forget(&socket, &call, deadline, &lease, &ann)
             } else {
-                crate::remember::run_one_face_keep(&socket, &call, deadline, &lease, &ann)
+                crate::remember::run_one_face_keep(&socket, &call, deadline, &lease, &ann, false)
             };
             let asked = served.join().unwrap();
             std::fs::remove_file(socket).unwrap();
@@ -8373,6 +8391,7 @@ mod tests {
                 std::time::Duration::from_secs(2),
                 &lease,
                 &ann,
+                false,
             );
             let asked = served.join().unwrap();
             std::fs::remove_file(socket).unwrap();
@@ -8987,5 +9006,77 @@ mod tests {
             format!("Hand it over.{}", crate::agent_tasks::MAKE_TOLD)
         );
         assert_eq!(tools[1].description.len(), 1_000);
+    }
+
+    /// #7876, through the worker's own dispatch: a second-route worker
+    /// given `--remember-speaker` by its coordinator (its environment
+    /// cleared of `LAMP_REMEMBER_SPEAKER`), with `LAMP_FACE_NO_ASK`,
+    /// `LAMP_MEMORY_PERSONAL_NEEDS_FACE` and `LAMP_NAME_LEARN_FIX` on and
+    /// nobody known, is told to call the face save now for "my name is
+    /// Ada" (`NoAsk::Save`), the switch read from its memory route
+    /// ([`run_call_with_scope`] to `remember::run_for_guarded`); the same
+    /// worker without the flag keeps nothing and asks nothing
+    /// (`NAME_QUIET`). The switches are the process's, so it runs in a child.
+    #[test]
+    fn a_workers_remember_speaker_flag_reaches_the_needs_face_choice_through_its_route() {
+        const NAME: &str = "tools::tests::a_workers_remember_speaker_flag_reaches_the_needs_face_choice_through_its_route";
+        const CHILD: &str = "LAMP_TEST_WORKER_NO_ASK_CHILD";
+        if std::env::var_os(CHILD).is_none() {
+            let output = std::process::Command::new(std::env::current_exe().unwrap())
+                .args(["--exact", NAME, "--nocapture", "--test-threads=1"])
+                .env(CHILD, "1")
+                .env(crate::known_faces::FACE_NO_ASK_ENVIRONMENT, "on")
+                .env(crate::remember::needs_face::ENVIRONMENT, "on")
+                .env(crate::known_faces::NAME_LEARN_FIX_ENVIRONMENT, "on")
+                .env_remove(crate::remember_speaker::ENVIRONMENT)
+                .output()
+                .unwrap();
+            let said = format!(
+                "{}\n{}",
+                String::from_utf8_lossy(&output.stdout),
+                String::from_utf8_lossy(&output.stderr)
+            );
+            assert!(output.status.success(), "{said}");
+            assert!(said.contains("1 passed"), "the child ran no test: {said}");
+            return;
+        }
+        assert!(std::env::var_os(crate::remember_speaker::ENVIRONMENT).is_none());
+        let call = ToolCall {
+            id: "n1".into(),
+            name: crate::remember::REMEMBER.into(),
+            args: json!({"text": "my name is Ada"}),
+        };
+        let told_with = |speaker_bound: bool| {
+            let mut flags = vec![
+                crate::remember::FLAG,
+                "/missing-memory.sock",
+                "--who-socket",
+                "/missing-eyes.sock",
+                crate::known_faces::NAMES_FLAG,
+            ];
+            if speaker_bound {
+                flags.push(crate::remember_speaker::FLAG);
+            }
+            let flags: Vec<String> = flags.into_iter().map(str::to_owned).collect();
+            let (settings, rest) = take(&flags).unwrap();
+            assert!(rest.is_empty(), "{rest:?}");
+            assert_eq!(settings.remember_speaker, speaker_bound);
+            let route = route(&settings, crate::remember::REMEMBER);
+            assert!(matches!(route, Route::Memory(_, Some(_), ..)));
+            let (_, (told, answered)) = run_call_with_scope(&route, &call, 7_876_001, false, None);
+            assert!(answered, "{told}");
+            assert_eq!(told["remembered"], false, "{told}");
+            told["note"].as_str().unwrap().to_owned()
+        };
+        let saved = told_with(true);
+        assert!(
+            saved.contains(&format!(
+                "call {} with name \"Ada\" now",
+                crate::known_faces::REMEMBER
+            )),
+            "{saved}"
+        );
+        assert!(saved.contains("ask them nothing"), "{saved}");
+        assert_eq!(told_with(false), crate::remember::needs_face::NAME_QUIET);
     }
 }
