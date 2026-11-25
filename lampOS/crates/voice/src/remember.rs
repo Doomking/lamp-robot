@@ -12110,9 +12110,10 @@ impl DaysClient {
             }
             // And the household's yes to music and laughter, and to how a
             // face seems: "a forget or the reset wipes it" (the lead on
-            // #2110), whoever asked. With `LAMP_NOTICING_BY_DEFAULT` on
-            // (#7767) only a kept yes goes: a kept no stays, so the forget
-            // never turns either on ([`crate::seen_yes::forget_takes`]).
+            // #2110), whoever asked. With `LAMP_NOTICING_BY_DEFAULT` on, or
+            // off with the done mark there (#7767), only a kept yes goes: a
+            // kept no stays, so the forget never turns either on
+            // ([`crate::seen_yes::forget_takes`]).
             if call.name == FORGET_EVERYTHING {
                 let by_default = lamp_msgs::consent::noticing_by_default();
                 for (field, key, consent) in [
