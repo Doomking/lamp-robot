@@ -1305,6 +1305,54 @@ pub const PERSON_SCOPE_ONE_FACE_ENVIRONMENT: &str = "LAMP_PERSON_SCOPE_ONE_FACE"
 /// ([`Engine::reading_by_one_face`]).
 pub const PERSON_SCOPE_ONE_FACE_READS_ENVIRONMENT: &str = "LAMP_PERSON_SCOPE_ONE_FACE_READS";
 
+/// With [`PERSON_SCOPE_ONE_FACE_READS_ENVIRONMENT`] and the eyes reading
+/// who speaks (`LAMP_EYES_SPEAKING`): on a line its person's by their own
+/// known face alone in view, the mouth not seen saying it
+/// (`ScopeLease::in_view_by_one_face`: not carried, sticky, gap-held or
+/// narrowed), a forget, a correction (`remember` with `replaces`),
+/// `forget_everything` and `forget_my_face` are each held for one yes, and
+/// their plain yes runs it on a later such line, no face but theirs seen
+/// speaking it, the mouth not needed ([`hold_on_face_yes`],
+/// [`take_held_forget`]). A bare "forget that" right after their one-face
+/// keep is held as the forget of that kept id. The memory owner's ruling on
+/// #8570 (25 Nov, 14:33): mouth detection is not trustable, a confirmation
+/// tells the person what is removed, and the scope is single-user. Carried
+/// and sticky lines, gap holds, a second face, another's yes, a no and a
+/// late yes are as before. `on`, and nothing else; off, as before, byte for
+/// byte.
+pub const ONE_FACE_FORGETS_ON_YES_ENVIRONMENT: &str = "LAMP_ONE_FACE_FORGETS_ON_YES";
+static ONE_FACE_FORGETS_ON_YES: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+
+#[cfg(test)]
+thread_local! {
+    /// [`ONE_FACE_FORGETS_ON_YES_ENVIRONMENT`] for one test's own thread
+    /// ([`set_one_face_forgets_on_yes_for_test`]).
+    static ONE_FACE_FORGETS_ON_YES_FOR_TEST: std::cell::Cell<Option<bool>> =
+        const { std::cell::Cell::new(None) };
+}
+
+/// Whether [`ONE_FACE_FORGETS_ON_YES_ENVIRONMENT`] is on in this process,
+/// read once.
+pub fn one_face_forgets_on_yes() -> bool {
+    #[cfg(test)]
+    if let Some(on) = ONE_FACE_FORGETS_ON_YES_FOR_TEST.with(std::cell::Cell::get) {
+        return on;
+    }
+    *ONE_FACE_FORGETS_ON_YES.get_or_init(|| {
+        std::env::var(ONE_FACE_FORGETS_ON_YES_ENVIRONMENT)
+            .ok()
+            .as_deref()
+            == Some("on")
+    })
+}
+
+/// [`ONE_FACE_FORGETS_ON_YES_ENVIRONMENT`] on or off for the calling test's
+/// thread alone; `None` reads the environment again.
+#[cfg(test)]
+pub(crate) fn set_one_face_forgets_on_yes_for_test(on: Option<bool>) {
+    ONE_FACE_FORGETS_ON_YES_FOR_TEST.with(|cell| cell.set(on));
+}
+
 /// A known person's line narrowed to the room for want of a face seen
 /// speaking it is still *named* for its reply when no face at all was seen
 /// speaking it, their own known face was the one face in view through it by
@@ -12069,9 +12117,7 @@ async fn spoken(
             true,
             &text,
             (asker.as_ref(), keep_asker(scope.as_ref()).as_ref()),
-            scope
-                .as_ref()
-                .is_some_and(crate::memory_scope::ScopeLease::by_one_face),
+            YesLine::of(scope.as_ref()),
             (shared.clock)(),
         );
         // In the owner's language, as its other fixed lines (#4473).
@@ -16030,6 +16076,12 @@ struct HeldForget {
     /// ([`OneFaceAnswer::PlainYes`]); "…, or keep it?" or a question after
     /// it leaves the yes to the model.
     offered_alone: bool,
+    /// Held on a line theirs by their face alone in view, for a yes on such
+    /// a line (`LAMP_ONE_FACE_FORGETS_ON_YES`, [`hold_on_face_yes`]): only
+    /// a yes on a line [`YesLine::in_view`], none but theirs seen speaking
+    /// it, or one their face is seen saying, runs it, and its held run marks
+    /// it agreed ([`Taken::Runs`]). Never on a carried, sticky or gap line.
+    face_yes: bool,
 }
 
 /// The one kept thing of a person's a named forget asks to remove, by its
@@ -16205,7 +16257,11 @@ fn one_face_refused(scope: Option<&crate::memory_scope::ScopeLease>, call: &net:
                 // The lamp taking back its own keep of this request on its own
                 // doubt ([`undo_doubted_keep`]): no one's forget.
                 && !(call.name == crate::remember::FORGET
-                    && (own_undo || scope.agreed_forget(&call.args))))
+                    && (own_undo || scope.agreed_forget(&call.args)))
+                // The held run of the `forget_everything`, `forget_my_face`
+                // or correction their yes agreed to, by their face alone in
+                // view (`LAMP_ONE_FACE_FORGETS_ON_YES`): only that call.
+                && !(one_face_forgets_on_yes() && scope.held_yes_agreed(&call.name, &call.args)))
     }) && one_face_refuses(
         &call.name,
         &call.args,
@@ -17049,15 +17105,49 @@ fn kept_subject(held: &net::ToolCall) -> Option<&str> {
         .flatten()
 }
 
+/// What a held call's yes line is by the one-face rule
+/// ([`take_held_forget`]): theirs by it at all (`ScopeLease::by_one_face`,
+/// carried lines among them), and theirs by their own face alone in view
+/// with `LAMP_ONE_FACE_FORGETS_ON_YES` on (`ScopeLease::in_view_by_one_face`).
+#[derive(Clone, Copy, Debug, Default)]
+struct YesLine {
+    by_one_face: bool,
+    in_view: bool,
+}
+
+impl YesLine {
+    /// The line of `scope`, as the turn reads it.
+    fn of(scope: Option<&crate::memory_scope::ScopeLease>) -> Self {
+        Self {
+            by_one_face: scope.is_some_and(crate::memory_scope::ScopeLease::by_one_face),
+            in_view: one_face_forgets_on_yes()
+                && scope.is_some_and(crate::memory_scope::ScopeLease::in_view_by_one_face),
+        }
+    }
+}
+
+/// A line theirs by the one-face rule or not, never by their face alone in
+/// view (a test's yes line).
+impl From<bool> for YesLine {
+    fn from(by_one_face: bool) -> Self {
+        Self {
+            by_one_face,
+            in_view: false,
+        }
+    }
+}
+
 fn take_held_forget(
     shared: &Shared,
     request: u64,
     heard: bool,
     said: &str,
     (asker, line_person): (Option<&HeldAsker>, Option<&HeldAsker>),
-    by_one_face: bool,
+    yes_line: impl Into<YesLine>,
     now: Instant,
 ) -> Taken {
+    let yes_line = yes_line.into();
+    let by_one_face = yes_line.by_one_face;
     let Ok(mut hold) = shared.held_forget.lock() else {
         return Taken::Nothing;
     };
@@ -17066,6 +17156,17 @@ fn take_held_forget(
     let Some(held) = hold.held.take() else {
         return Taken::Nothing;
     };
+    // With `LAMP_ONE_FACE_FORGETS_ON_YES` (the memory owner's ruling on
+    // #8570): this yes line is theirs by their own face alone in view, the
+    // eyes reading who speaks and no face seen speaking it, so their yes
+    // counts with no mouth seen. A face seen speaking it is judged by sight
+    // as before; a carried, sticky, gap-held or narrowed line never is one.
+    let face_yes_line = yes_line.in_view
+        && one_face_forgets_on_yes()
+        && shared.forget_sight.is_some()
+        && !sight
+            .as_ref()
+            .is_some_and(|(seen, speakers, _)| *seen == request && !speakers.is_empty());
     // A hold past its window and a grace (`remember::HELD_FORGET_GRACE`) is
     // let go silently: nothing runs, the thing stays kept, nothing is told,
     // and this line goes as a plain line, so a new ask long after is never
@@ -17154,7 +17255,7 @@ fn take_held_forget(
             &held.asker,
         ) {
             Some(why)
-        } else if seen || (by_one_face && crate::person::private_room()) {
+        } else if seen || (by_one_face && crate::person::private_room()) || face_yes_line {
             None
         } else {
             eprintln!(
@@ -17180,8 +17281,10 @@ fn take_held_forget(
             None => {
                 let how = if seen {
                     "seen saying it"
-                } else {
+                } else if by_one_face && crate::person::private_room() {
                     "the private room"
+                } else {
+                    "their face the one face in view"
                 };
                 match one_face_answer(said, held.offered_alone) {
                     OneFaceAnswer::PlainYes => {
@@ -17252,13 +17355,24 @@ fn take_held_forget(
     // else". Its person is the line's own (`line_person`), since such a
     // line holds no forget asker; another face seen speaking the yes is
     // never theirs. A held forget's yes is unchanged.
+    // A held call's (`LAMP_ONE_FACE_FORGETS_ON_YES`, [`hold_on_face_yes`])
+    // is never a carried line's keep: only [`face_yes_line`] lets it go
+    // without the mouth.
     let keep_by_face = held.call.name == crate::remember::REMEMBER
+        && !held.face_yes
         && by_one_face
         && crate::keep_quietly::one_face_on()
         && !sight
             .as_ref()
             .is_some_and(|(seen, speakers, _)| *seen == request && !speakers.is_empty());
-    let asker = if keep_by_face { line_person } else { asker };
+    // A call held for a yes by their face alone in view, on such a line: its
+    // person is the line's own, as such a line holds no forget asker.
+    let by_face = held.face_yes && face_yes_line;
+    let asker = if keep_by_face || by_face {
+        line_person
+    } else {
+        asker
+    };
     let dropped = if !heard {
         Some("a turn the lamp wrote")
     } else if !held.asked {
@@ -17300,7 +17414,7 @@ fn take_held_forget(
         // A carried line's keep is let go only on a yes their face is seen
         // saying ([`hold_carried_keep`]).
         Some("the eyes don't read who speaks")
-    } else if keep_by_face {
+    } else if keep_by_face || by_face {
         None
     } else if by_one_face {
         // A line theirs only by their face alone in view
@@ -17341,7 +17455,16 @@ fn take_held_forget(
                     held.request
                 );
             }
-            Taken::Runs(held.call, held.line, false)
+            if by_face {
+                eprintln!(
+                    "lamp-voice second: request {request}: their plain yes runs the {} held in request {}: no face was seen saying it, their face the one face in view (LAMP_ONE_FACE_FORGETS_ON_YES)",
+                    held.call.name, held.request
+                );
+            }
+            // A call held for a yes by their face (seen saying it too) is
+            // marked agreed by its held run, so it passes the one-face
+            // refusal ([`one_face_refused`]) on a line theirs by one face.
+            Taken::Runs(held.call, held.line, held.face_yes)
         }
     }
 }
@@ -17902,17 +18025,18 @@ fn hold_forget(
     asker: (u64, String),
     now: Instant,
 ) -> Holding {
-    hold_forget_as(shared, request, call, asker, now, false)
+    hold_forget_as(shared, request, call, asker, now, (false, false))
 }
 
-/// [`hold_forget`], with `one_face` as [`HeldForget::one_face`].
+/// [`hold_forget`], with `one_face` as [`HeldForget::one_face`] and
+/// `face_yes` as [`HeldForget::face_yes`].
 fn hold_forget_as(
     shared: &Shared,
     request: u64,
     call: &net::ToolCall,
     asker: (u64, String),
     now: Instant,
-    one_face: bool,
+    (one_face, face_yes): (bool, bool),
 ) -> Holding {
     let Ok(mut hold) = shared.held_forget.lock() else {
         return Holding::Stale;
@@ -17946,6 +18070,7 @@ fn hold_forget_as(
         one_face,
         near: None,
         offered_alone: false,
+        face_yes,
     });
     Holding::Held
 }
@@ -18110,12 +18235,108 @@ async fn ask_once_forget(
         args: serde_json::json!({ "source_id": id, "about": subject }),
         extra: None,
     };
-    match hold_forget_as(shared, request, &held, asker, (shared.clock)(), true) {
+    match hold_forget_as(
+        shared,
+        request,
+        &held,
+        asker,
+        (shared.clock)(),
+        (true, false),
+    ) {
         Holding::Held => {
             eprintln!(
                 "lamp-voice second: request {request}: a named forget on a one-face line is asked about once, held for their yes (LAMP_PERSON_SCOPE_ONE_FACE_READS)"
             );
             Some(crate::remember::one_face_forget_asks(&subject))
+        }
+        Holding::OneWaits => Some(serde_json::json!({"error": crate::remember::ONE_FORGET_HELD})),
+        Holding::Stale => None,
+    }
+}
+
+/// With `LAMP_ONE_FACE_FORGETS_ON_YES` (the memory owner's ruling on
+/// #8570): on a spoken line its person's by their own known face alone in
+/// view, the mouth not seen saying it (`ScopeLease::in_view_by_one_face`),
+/// with the eyes reading who speaks, `call` is held for their one yes
+/// ([`HeldForget::face_yes`]), never run now and never refused: a
+/// `forget_everything` (unless `everything_refused`, these words asking
+/// for something less or not to), a `forget_my_face`, a correction (a
+/// `remember` with `replaces`), or a bare forget right after their
+/// one-face keep, as the forget of that kept id
+/// (`tools::one_face_just_kept_id`). The model is told to ask once, by the
+/// same notes as a held forget ([`crate::remember::held_forget_told`]) and,
+/// for a correction, [`crate::remember::held_correction_told`]. `None`, and
+/// the call goes on as before, for any other call or line, or the switch
+/// off.
+fn hold_on_face_yes(
+    shared: &Shared,
+    request: u64,
+    (heard, said): (bool, &str),
+    call: &net::ToolCall,
+    scope: Option<&crate::memory_scope::ScopeLease>,
+    everything_refused: bool,
+) -> Option<Value> {
+    let lease = scope?;
+    if !one_face_forgets_on_yes()
+        || !heard
+        || shared.forget_sight.is_none()
+        || held_by_gap(scope)
+        || !lease.in_view_by_one_face()
+    {
+        return None;
+    }
+    let asker = keep_asker(scope)?;
+    if lease.kept_by_one_face().as_deref() != Some(asker.1.as_str()) {
+        return None;
+    }
+    let bare = call.name == crate::remember::FORGET
+        && ["about", "source_id"]
+            .iter()
+            .all(|key| call.args.get(*key).is_none_or(Value::is_null));
+    let held = if bare {
+        // "Forget that" right after their one-face keep, its line naming
+        // nothing else: the kept id, peeked, never taken.
+        if crate::remember::named_subject(said).is_some() {
+            return None;
+        }
+        let id = crate::tools::one_face_just_kept_id(lease.key(), &asker.1)?;
+        net::ToolCall {
+            id: call.id.clone(),
+            name: crate::remember::FORGET.to_owned(),
+            args: serde_json::json!({ "source_id": id }),
+            extra: None,
+        }
+    } else if (call.name == crate::remember::FORGET_EVERYTHING && !everything_refused)
+        || call.name == crate::known_faces::FORGET
+        || crate::remember::corrects(&call.name, &call.args)
+    {
+        call.clone()
+    } else {
+        return None;
+    };
+    match hold_forget_as(
+        shared,
+        request,
+        &held,
+        asker,
+        (shared.clock)(),
+        (false, true),
+    ) {
+        Holding::Held => {
+            eprintln!(
+                "lamp-voice second: request {request}: {}{} on a line theirs by their face alone in view is held for their yes (LAMP_ONE_FACE_FORGETS_ON_YES)",
+                call.name,
+                if bare {
+                    ", right after their keep,"
+                } else {
+                    ""
+                }
+            );
+            Some(if crate::remember::corrects(&held.name, &held.args) {
+                crate::remember::held_correction_told()
+            } else {
+                crate::remember::held_forget_told(&held.name)
+            })
         }
         Holding::OneWaits => Some(serde_json::json!({"error": crate::remember::ONE_FORGET_HELD})),
         Holding::Stale => None,
@@ -19177,9 +19398,7 @@ async fn answer(
         heard,
         &said,
         (asker.as_ref(), keep_asker(scope.as_ref()).as_ref()),
-        scope
-            .as_ref()
-            .is_some_and(crate::memory_scope::ScopeLease::by_one_face),
+        YesLine::of(scope.as_ref()),
         (shared.clock)(),
     ) {
         Taken::Nothing => (None, None),
@@ -19728,6 +19947,16 @@ async fn answer(
                     && let Some(id) = call.args["source_id"].as_u64()
                 {
                     scope.mark_forget_agreed(&OneFaceForgetYes(()), id);
+                }
+                // Their yes to the `forget_everything`, `forget_my_face` or
+                // correction held on a line theirs by their face alone in
+                // view (`LAMP_ONE_FACE_FORGETS_ON_YES`, [`hold_on_face_yes`]):
+                // that exact call may run on this line too.
+                if one_face
+                    && call.name != crate::remember::FORGET
+                    && let Some(scope) = scope.as_ref()
+                {
+                    scope.mark_held_yes(&OneFaceForgetYes(()), &call.name, &call.args);
                 }
                 let result = run_tool(shared, request, heard, &call, scope.as_ref()).await;
                 if scope.as_ref().is_some_and(|scope| !scope.is_current()) {
@@ -22985,6 +23214,24 @@ async fn answer(
                 // their yes, never refused outright (the PM's cost ruling
                 // on #5627: 9 of 9 of the owner's own forgets refused on
                 // lamp-c0a4).
+                // With `LAMP_ONE_FACE_FORGETS_ON_YES`, their face alone in
+                // view: a forget of everything, of their face, a correction
+                // or a bare forget after their keep is held for their yes.
+                let everything_refused = call.name == crate::remember::FORGET_EVERYTHING
+                    && !crate::remember::forget_unguarded()
+                    && (everything_now == Some(false)
+                        || (everything_now.is_none() && asks_now && !asked_just_before));
+                if let Some(told) = hold_on_face_yes(
+                    shared,
+                    request,
+                    (heard, &heard_words),
+                    call,
+                    scope.as_ref(),
+                    everything_refused,
+                ) {
+                    messages.push(Message::tool(call.id.clone(), told.to_string()));
+                    continue;
+                }
                 if let Some(told) =
                     ask_once_forget(shared, request, heard, &heard_words, call, scope.as_ref())
                         .await

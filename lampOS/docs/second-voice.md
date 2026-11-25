@@ -7036,7 +7036,10 @@ stands), and eyes that can't be reached at all name nobody, as before. Without a
   the subject in their words, never the kept text (the Reviewer-lead's P2
   on #6673). Their
   yes on a later line within 30 s, the same session's same person
-  (`keep_asker`), seen saying it or in the private room on a one-face line,
+  (`keep_asker`), seen saying it or in the private room on a one-face line
+  (or, with `LAMP_ONE_FACE_FORGETS_ON_YES`, on a line theirs by their face
+  alone in view, `ScopeLease::in_view_by_one_face`, no face seen speaking
+  it),
   judged by the model with no yes word list (its `forget` on that line,
   naming nothing else, `agree_held_forget`; the first builder's ruling on
   leg (e) of #7960's ROW) runs that forget by id, exactly as held, in
@@ -7055,7 +7058,22 @@ stands), and eyes that can't be reached at all name nobody, as before. Without a
   answered "Okay, I'll keep it." (`remember::KEPT_IT_LINE`) with no model
   round, in the owner's language only from its clip rendered ahead
   (`kept_line_clip`), else the model is told it is kept (#8185). A
-  privacy switch change drops the held question (`Engine::privacy`). So are a correction
+  privacy switch change drops the held question (`Engine::privacy`).
+  With `LAMP_ONE_FACE_FORGETS_ON_YES` (off by default, #8570), before
+  `ask_once_forget`, `hold_on_face_yes` holds for one yes, on a line theirs
+  by their face alone in view (`ScopeLease::in_view_by_one_face`) with the
+  eyes reading who speaks: `forget_everything` (unless these words ask for
+  less), `forget_my_face`, a correction (`remember` with `replaces`) and a
+  bare forget right after their one-face keep, as the forget of the kept id
+  (`tools::one_face_just_kept_id`), each told the held notes in use or
+  `remember::HELD_CORRECTION_ASKS` (`HeldForget::face_yes`). In
+  `take_held_forget` (`YesLine`), their plain yes within 60 s on such a
+  line, no face seen speaking it, runs it, its person the line's own
+  (`keep_asker`); a carried, sticky or gap-held yes line drops it as unseen,
+  and `LAMP_KEEP_QUIETLY_ONE_FACE`'s carried keep yes never lets it go. The
+  held run marks it (`ScopeLease::mark_held_yes`, `mark_forget_agreed`), so
+  that call alone passes `one_face_refused` and the memory route's
+  correction check. Otherwise refused, as before: a correction
   (`remember` with `replaces`), `keep_rule`, `list_rules`, `set_role` and
   `end_role` (the privacy read on #5385, also in
   `remember::role_for_guarded`), and

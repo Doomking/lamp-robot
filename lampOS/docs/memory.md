@@ -920,6 +920,31 @@ room's `forget_last`, and the room's Wi-Fi name went (#5608, Jarvis's P2s).
 A guest off camera or a TV saying "forget that" beside her silent face
 forgets nothing. Said with their mouth read speaking, the line is theirs and
 the forget runs in their scope as any of theirs.
+**With `LAMP_ONE_FACE_FORGETS_ON_YES` (off by default; #8570, the memory
+owner's ruling of 25 Nov: mouth-moving detection is not trustable, a
+confirmation tells the person what is removed, and the scope is
+single-user), the mouth no longer gates a forget or a correction on the
+second route.** On a line theirs by their own face alone in view, the mouth
+not seen and the line not carried, sticky, gap-held or narrowed
+(`ScopeLease::in_view_by_one_face`), a bare "forget that" right after their
+plain new keep is held as the forget of that kept id
+(`tools::one_face_just_kept_id`, a peek at `ONE_FACE_KEPT`, which keeps the
+id `LAMP_MEMORY_REPLACES` tells; the second route's calls run in its own
+worker's process, so the mark and the peek are the same process's), and so
+are `forget_everything`, `forget_my_face` and a correction (a `remember`
+with `replaces`), each as called (`second_provider::hold_on_face_yes`).
+Nothing runs on the asking line; the model is told to ask once, by the held
+notes already in use (`held_forget_told`, `FORGET_EVERYTHING_ASKS`) or, for
+a correction, `HELD_CORRECTION_ASKS`, which never names the old fact. Their
+plain yes within 60 s on a later line theirs by their face alone in view,
+no face seen speaking it, runs exactly that call in their scope
+(`take_held_forget`, `HeldForget::face_yes`); its held run marks it agreed
+(`ScopeLease::mark_held_yes`, `mark_forget_agreed`), so it alone passes the
+one-face refusal and the memory route's correction check. The provider
+route has no hold and still answers `ONE_FACE_JUST_KEPT`. A carried line,
+a sticky or gap-held line, a second face, another's yes, a no, a late yes
+and a written turn are as before, and a carried line's yes never lets such
+a hold go.
 **A forget is never said done unless one ran and removed something**
 (C88, B-G23; `LAMP_ACTION_CLAIM_CHECKED`, on in the product). On lamp-06c1
 (10 Nov, build 11091, request 30) "Lamp, forget that." with her face still
@@ -1022,7 +1047,9 @@ again for their yes", so on stable a yes ran nothing).
 Only their yes on a later line within 30 s
 (`remember::ONE_FACE_FORGET_YES_FOR`), from the same session's same person,
 with their face seen saying it, or in the private room
-(`LAMP_PRIVATE_ROOM`) on a line theirs by their face alone in view, runs
+(`LAMP_PRIVATE_ROOM`) on a line theirs by their face alone in view, or
+with `LAMP_ONE_FACE_FORGETS_ON_YES` on a line theirs by their face alone in
+view, no face seen speaking it and the line not carried, runs
 exactly that forget by id in their scope (`ScopeLease::mark_forget_agreed`,
 never `forget_last`). The held forget carries the subject's words
 (`about`); once the by-id forget is confirmed, that person's own exchanges

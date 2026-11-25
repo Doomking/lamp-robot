@@ -1621,7 +1621,33 @@ quên theo id chỉ đi tới phạm vi mà danh sách của nó đã cho thấy
 phiên này, và một id đã hiện ở cả hai thì không quên gì và mô hình hỏi là
 cái nào (`remember::by_where_shown`; P2 thứ hai của Thirteen trên #5022). Và **một
 lời «có» nói trên câu như vậy không bao giờ chạy một lệnh quên đang giữ**
-(`ScopeLease::by_one_face`): lời «có» vẫn cần thấy mặt họ nói. Rủi ro còn lại:
+(`ScopeLease::by_one_face`): lời «có» vẫn cần thấy mặt họ nói.
+**Với `LAMP_ONE_FACE_FORGETS_ON_YES` (mặc định tắt; #8570, phán quyết của
+chủ bộ nhớ ngày 25/11: nhận diện miệng mấp máy không đáng tin, một lời xác
+nhận cho người dùng biết điều gì bị xoá, và phạm vi là một người dùng), miệng
+không còn chặn lệnh quên hay lệnh sửa trên tuyến thứ hai.** Trên một câu là
+của họ vì chỉ mặt họ trong khung, không thấy miệng nói, và câu không được
+mang tiếp, không phải tên mắt giữ (sticky), không bị giữ vì khoảng trống hay
+bị thu hẹp (`ScopeLease::in_view_by_one_face`): một câu «forget that» trần
+ngay sau lần lưu mới của họ được giữ như lệnh quên đúng id vừa lưu
+(`tools::one_face_just_kept_id`, chỉ xem `ONE_FACE_KEPT` mà không lấy đi; id
+có nhờ `LAMP_MEMORY_REPLACES`; các lệnh của tuyến thứ hai chạy trong chính
+tiến trình worker của nó, nên dấu và lần xem là của cùng một tiến trình), và
+`forget_everything`, `forget_my_face` cùng một lệnh sửa (`remember` có
+`replaces`) cũng được giữ đúng như đã gọi
+(`second_provider::hold_on_face_yes`). Không gì chạy trên câu hỏi; mô hình
+được bảo hỏi một lần bằng các ghi chú giữ chờ sẵn có (`held_forget_told`,
+`FORGET_EVERYTHING_ASKS`), hoặc với lệnh sửa là `HELD_CORRECTION_ASKS`, không
+bao giờ nêu điều cũ. Lời «có» rõ ràng của họ trong 60 giây ở một câu sau cũng
+là của họ vì chỉ mặt họ trong khung, không mặt nào được thấy nói câu ấy, chạy
+đúng lệnh ấy trong phạm vi của họ (`take_held_forget`, `HeldForget::face_yes`);
+lần chạy giữ chờ đánh dấu nó đã được đồng ý (`ScopeLease::mark_held_yes`,
+`mark_forget_agreed`), nên chỉ lệnh ấy qua được lệnh từ chối một mặt và bước
+kiểm tra lệnh sửa của tuyến bộ nhớ. Tuyến provider không có giữ chờ và vẫn trả
+`ONE_FACE_JUST_KEPT`. Câu được mang tiếp, câu sticky hay giữ vì khoảng trống,
+một mặt thứ hai, lời «có» của người khác, một lời «không», lời «có» muộn và
+lượt viết vẫn như cũ, và lời «có» trên câu được mang tiếp không bao giờ thả một
+lệnh giữ như vậy. Rủi ro còn lại:
 một giọng ngoài khung hình khi họ ngồi một mình trong khung, không có dấu giọng
 để phân biệt, có thể được lưu vào ký ức của họ, và lệnh `forget` một mục của
 giọng ấy có thể xoá trong đó tối đa tám điều khớp (một `forget {about}` quên
@@ -1666,7 +1692,9 @@ vòng 30 giây thì gọi `forget`, không nêu gì khác, và chỉ lời gọi
 again for their yes», nên trên stable lời «có» không chạy gì). Chỉ lời «có» của họ ở câu sau trong vòng 30 giây
 (`remember::ONE_FACE_FORGET_YES_FOR`), của cùng người trong cùng phiên, khi
 thấy mặt họ nói, hoặc trong phòng riêng (`LAMP_PRIVATE_ROOM`) trên một câu là
-của họ vì mặt họ một mình trong khung, mới chạy đúng lệnh quên theo id ấy
+của họ vì mặt họ một mình trong khung, hoặc với `LAMP_ONE_FACE_FORGETS_ON_YES`
+trên một câu là của họ vì chỉ mặt họ trong khung, không mặt nào được thấy nói
+và câu không được mang tiếp, mới chạy đúng lệnh quên theo id ấy
 trong phạm vi của họ (`ScopeLease::mark_forget_agreed`, không bao giờ
 `forget_last`). **Câu ấy có phải lời «có» hay không do mô hình phán đoán, không
 có danh sách từ «có»** (quy tắc ngày 13/11 của chủ sản phẩm; phán quyết của
