@@ -2280,7 +2280,7 @@ fn shows_held(toml: &str, shows: &[(String, String)]) -> Result<(), Refused> {
 /// of it ("that code may use the camera"). `skills` is left out: code a
 /// model wrote never puts other skills on the lamp, which would then run
 /// with no yes of their own ([`SKILLS_GRANT`]).
-pub const GRANTS: [(&str, &str); 12] = [
+pub const GRANTS: [(&str, &str); 13] = [
     ("body", "its head and arm"),
     ("light", "its light"),
     ("speak", "its voice and sounds"),
@@ -2293,6 +2293,7 @@ pub const GRANTS: [(&str, &str); 12] = [
     ("microphone", "the microphone"),
     ("notes", "small notes of its own on the lamp"),
     ("speech", "everything the lamp says out loud"),
+    ("volume", "the speaker's volume, never a sound"),
 ];
 
 /// The grants the making model is told of ([`GRANTS`]): `notes` only with
@@ -10363,7 +10364,12 @@ pub fn keep_asked(
     // through the lamp's told answer (#8610): refused here, before its
     // check and its try, so its code never speaks during the make; the
     // repair is told to print instead.
-    told_only(&files.toml)?;
+    told_only(&files.toml).inspect_err(|_| {
+        eprintln!(
+            "lamp-voice: a made skill was not kept: a trigger starts it and its code would speak \
+             on its own (a run step, or a speak or speaker grant)"
+        );
+    })?;
     // A skill the lamp's agent made with code says what it uses, where its
     // result is and what it answers (#8157): never a built-in, Store or
     // pushed skill's, nor the lamp's own model's.
@@ -11603,14 +11609,29 @@ pub const SPEAKS_ON_ITS_OWN: &str =
 pub const TOLD_ONLY_TRY: &str = "That one would speak on its own; I can only keep it if it tells \
      me and I say it when you're here.";
 
+/// The told answer's form, as a repair and `lamp-skills pack` tell it
+/// ([`TOLD_ONLY_SHAPE`], [`TOLD_ONLY_REPAIR`]): one text, never two.
+macro_rules! told_only_shape {
+    () => {
+        "a skill a time, an event or a repeat starts (any [trigger]) tells the person only \
+         through the lamp's told answer, said when they are there. Make its [[do]] a task step \
+         (task = { task, run }), never a run step; take speak and speaker out of its grants \
+         (volume alone sets the volume); have its scripts print what they found and never call \
+         lamp.say, lamp.sound, the speaker or control.sock; and end the agent's answer with the \
+         short spoken summary, never a dash."
+    };
+}
+
+/// The told answer's form (#8610), as `lamp-skills pack` tells the agent's
+/// own check mid-make, after [`SPEAKS_ON_ITS_OWN`].
+pub const TOLD_ONLY_SHAPE: &str = told_only_shape!();
+
 /// What a repair is told of a skill refused as [`SPEAKS_ON_ITS_OWN`], as
 /// the try's failure: the told answer's form.
-pub const TOLD_ONLY_REPAIR: &str = "When the lamp tried the skill once, it would speak on its \
-     own: a skill a time, an event or a repeat starts (any [trigger]) tells the person only \
-     through the lamp's told answer, said when they are there. Make its [[do]] a task step \
-     (task = { task, run }), never a run step; take speak and speaker out of its grants; have \
-     its scripts print what they found and never call lamp.say, lamp.sound, the speaker or \
-     control.sock; and end the agent's answer with the short spoken summary, never a dash.";
+pub const TOLD_ONLY_REPAIR: &str = concat!(
+    "When the lamp tried the skill once, it would speak on its own: ",
+    told_only_shape!()
+);
 
 /// The grants that let a skill's code speak through lamp-control: `say`,
 /// `sound` and `turn.start` need `speak`, a speaker stream `speaker`.
@@ -11624,7 +11645,10 @@ const SPEAKING_GRANTS: [&str; 2] = ["speak", "speaker"];
 /// `grants` name `speak` or `speaker` (lamp-control's grants for every op
 /// that sounds, so the rule holds at each run too). A skill only the
 /// person's words start, and fixed `say` and `remind` steps, are as before.
-fn told_only(toml: &str) -> Result<(), Refused> {
+/// `volume` is not a speaking grant: a trigger's skill that only sets the
+/// volume is kept (El's P2.2 on #8651). The one rule for the voice's keep
+/// and for `lamp-skills pack`, the agent's own check mid-make.
+pub fn told_only(toml: &str) -> Result<(), Refused> {
     let Ok(table) = toml::from_str::<toml::Table>(toml) else {
         return Ok(());
     };
@@ -11649,15 +11673,6 @@ fn told_only(toml: &str) -> Result<(), Refused> {
         .filter_map(toml::Value::as_str)
         .any(|grant| SPEAKING_GRANTS.contains(&grant));
     if runs || (tasks && speaking) {
-        eprintln!(
-            "lamp-voice: a made skill was not kept: a trigger starts it and its code would speak \
-             on its own ({})",
-            if runs {
-                "a run step"
-            } else {
-                "a speaking grant"
-            }
-        );
         return Err(Refused(
             SPEAKS_ON_ITS_OWN.into(),
             Some(TOLD_ONLY_REPAIR.into()),
