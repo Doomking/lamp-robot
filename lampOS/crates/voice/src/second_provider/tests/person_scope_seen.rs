@@ -7714,15 +7714,10 @@ async fn row_8654_l4_a_held_correction_is_asked_with_the_quiet_switches_on() {
     );
 }
 
-/// Row 8654 L2 (lamp-06c1, build 16102, tries 2 and 3): "Forget that." right
-/// after their one-face keep was asked back in words, the model calling
-/// nothing; on "Yes, please." it called a bare forget, the keep's request
-/// + 2, and it was refused as a bare forget. That forget is now held as the
-/// forget of the kept id, asked about once, and their next yes runs it.
-#[tokio::test]
-async fn row_8654_l2_a_bare_forget_on_the_yes_after_a_word_ask_is_held_and_runs() {
-    let a = crate::remember::person_id("A");
-    KEEP_MARKS.with(|marks| marks.set(Some(93)));
+/// The model's turns for row 8654 L2 as the lamp saw it: the keep, "Forget
+/// that." asked back in words with no call, then a bare forget called on
+/// their "Yes, please.", and its answer.
+fn row_8654_l2_chats() -> Vec<Vec<net::Result<ChatEvent>>> {
     let mut chats = one_call(
         crate::remember::REMEMBER,
         json!({"text": "Parking spot is B12."}),
@@ -7731,36 +7726,67 @@ async fn row_8654_l2_a_bare_forget_on_the_yes_after_a_word_ask_is_held_and_runs(
         text("Do you want me to forget your parking spot?"),
         Ok(ChatEvent::Done),
     ]);
-    chats.extend(asks_then(
-        crate::remember::FORGET,
-        json!({}),
-        "Shall I forget that?",
-        1,
-    ));
-    let got = face_yes_chats(
-        "row-8654-l2",
-        vec![
-            line(
-                "Remember my parking spot is B twelve.",
-                vec![("f1", false)],
-                0,
-            ),
-            line("Forget that.", vec![("f1", false)], 3),
-            line("Yes, please.", vec![("f1", false)], 3),
-            line("Yes.", vec![("f1", false)], 3),
-        ],
-        chats,
-        true,
-    )
-    .await;
-    assert!(held_told(&got, HELD), "held and asked: {:?}", got.rounds);
-    assert_eq!(
-        ran_named(&got, crate::remember::FORGET),
-        [json!({"source_id": 93})],
-        "{:?}",
-        got.labels
-    );
-    assert_eq!(got.calls, [Some(a.clone()), Some(a)], "A's keep and forget");
+    chats.extend(one_call(crate::remember::FORGET, json!({})));
+    // Spare, so a second ask (the bug) still reaches the asserts.
+    chats.push(vec![text("Shall I forget that?"), Ok(ChatEvent::Done)]);
+    chats
+}
+
+/// Row 8654 L2 (lamp-06c1, build 16102, tries 2 and 3): "Forget that." right
+/// after their one-face keep was asked back in words, the model calling
+/// nothing; on "Yes, please." it called a bare forget, the keep's request
+/// + 2, and it was refused as a bare forget. That call is their agreement:
+/// it runs at once as the forget of the kept id, once, and nothing is asked
+/// again (CLAUDE.md rule 8: one ask, one yes). A second face in view at the
+/// yes runs nothing.
+#[tokio::test]
+async fn row_8654_l2_a_bare_forget_on_the_yes_after_a_word_ask_runs_at_once() {
+    let a = crate::remember::person_id("A");
+    for (at, in_view) in [
+        ("alone", vec![("f1", false)]),
+        ("two", vec![("f1", false), ("f2", false)]),
+    ] {
+        KEEP_MARKS.with(|marks| marks.set(Some(93)));
+        let got = face_yes_chats(
+            &format!("row-8654-l2-{at}"),
+            vec![
+                line(
+                    "Remember my parking spot is B twelve.",
+                    vec![("f1", false)],
+                    0,
+                ),
+                line("Forget that.", vec![("f1", false)], 3),
+                line("Yes, please.", in_view, 3),
+            ],
+            row_8654_l2_chats(),
+            true,
+        )
+        .await;
+        assert!(
+            !held_told(&got, HELD),
+            "{at}: never held and asked again: {:?}",
+            got.rounds
+        );
+        if at == "alone" {
+            assert_eq!(
+                ran_named(&got, crate::remember::FORGET),
+                [json!({"source_id": 93})],
+                "{at}: {:?}",
+                got.labels
+            );
+            assert_eq!(
+                got.calls,
+                [Some(a.clone()), Some(a.clone())],
+                "A's keep and forget"
+            );
+        } else {
+            assert!(
+                ran_named(&got, crate::remember::FORGET).is_empty(),
+                "{at}: a second face at the yes runs nothing: {:?}",
+                got.ran
+            );
+        }
+    }
 }
 
 /// Set in the child process [`row_8654_l2_on_the_real_route`] runs in.
@@ -7772,8 +7798,8 @@ const REAL_ROUTE_CHILD: &str = "LAMP_TEST_ROW_8654_REAL_ROUTE";
 /// with `LAMP_MEMORY_REPLACES` on, as on lamp-06c1, which marks the kept id
 /// (`tools::ONE_FACE_KEPT`); then L2 as the lamp saw it: "Forget that."
 /// answered in words, no call, and a bare forget, no source named, called
-/// on "Yes, please.": held as the forget of that id, and their next yes
-/// runs it. In a child process: the Days client is once per process.
+/// on "Yes, please.": it runs at once as the forget of that id and reaches
+/// the memory, never asked again. In a child process: the Days client is once per process.
 #[tokio::test]
 async fn row_8654_l2_on_the_real_route() {
     const NAME: &str = "second_provider::tests::person_scope_seen::row_8654_l2_on_the_real_route";
@@ -7802,25 +7828,11 @@ async fn row_8654_l2_on_the_real_route() {
         said: vec![
             "Okay.",
             "Do you want me to forget your parking spot?",
-            "Shall I forget that?",
-            "Done.",
+            "Okay.",
         ],
         base,
     };
-    let mut chats = one_call(
-        crate::remember::REMEMBER,
-        json!({"text": "Parking spot is B12."}),
-    );
-    chats.push(vec![
-        text("Do you want me to forget your parking spot?"),
-        Ok(ChatEvent::Done),
-    ]);
-    chats.extend(asks_then(
-        crate::remember::FORGET,
-        json!({}),
-        "Shall I forget that?",
-        1,
-    ));
+    let chats = row_8654_l2_chats();
     crate::second_provider::set_one_face_forgets_on_yes_for_test(Some(true));
     ONE_FACE_READS.with(|reads| reads.set(true));
     crate::person::set_private_room_for_test(Some(false));
@@ -7834,7 +7846,6 @@ async fn row_8654_l2_on_the_real_route() {
             ),
             line("Forget that.", vec![("f1", false)], 3),
             line("Yes, please.", vec![("f1", false)], 3),
-            line("Yes.", vec![("f1", false)], 3),
         ],
         chats,
         (BOOT, true, true),
@@ -7859,11 +7870,17 @@ async fn row_8654_l2_on_the_real_route() {
         memory.iter().any(|ask| ask["op"] == "remember"),
         "the keep reached the memory: {memory:?}"
     );
-    assert!(held_told(&got, HELD), "held and asked: {:?}", got.rounds);
+    assert!(!held_told(&got, HELD), "not asked again: {:?}", got.rounds);
     assert_eq!(
         ran_named(&got, crate::remember::FORGET),
         [json!({"source_id": 1})],
-        "the kept id's forget, on their yes alone: {:?}",
+        "the kept id's forget, on their yes: {:?}",
         got.labels
+    );
+    assert!(
+        memory
+            .iter()
+            .any(|ask| ask["op"].as_str().is_some_and(|op| op.contains("forget"))),
+        "the forget reached the memory: {memory:?}"
     );
 }

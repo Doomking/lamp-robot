@@ -18254,6 +18254,59 @@ async fn ask_once_forget(
     }
 }
 
+/// With `LAMP_ONE_FACE_FORGETS_ON_YES`: a bare `forget` the model calls on
+/// a line that is only a yes (`remember::heard::only_a_yes`), theirs by
+/// their own face alone in view, none seen speaking it
+/// (`ScopeLease::in_view_by_one_face`), after a line between it and their
+/// one-face keep (the model's own ask in words) and within that keep's
+/// window (`tools::one_face_kept_mark`, `remember::HELD_FORGET_FOR`): the
+/// model judged the yes as agreeing to forget it, so the call is that
+/// forget by the kept id, marked agreed (`ScopeLease::mark_forget_agreed`),
+/// and runs now, never held and asked again (row 8654 L2). `None` for any
+/// other call or line, or the switch off: a carried, sticky or gap-held
+/// line, a second face, another person's yes or a late yes runs nothing.
+fn agreed_on_face_yes(
+    shared: &Shared,
+    request: u64,
+    (heard, said): (bool, &str),
+    call: &net::ToolCall,
+    scope: Option<&crate::memory_scope::ScopeLease>,
+) -> Option<net::ToolCall> {
+    let lease = scope?;
+    let bare = call.name == crate::remember::FORGET
+        && ["about", "source_id"]
+            .iter()
+            .all(|key| call.args.get(*key).is_none_or(Value::is_null));
+    if !one_face_forgets_on_yes()
+        || !bare
+        || !heard
+        || shared.forget_sight.is_none()
+        || held_by_gap(scope)
+        || !lease.in_view_by_one_face()
+        || !crate::remember::heard::only_a_yes(said)
+    {
+        return None;
+    }
+    let asker = keep_asker(scope)?;
+    if lease.kept_by_one_face().as_deref() != Some(asker.1.as_str()) {
+        return None;
+    }
+    let (kept_at, id) = crate::tools::one_face_kept_mark(lease.key(), &asker.1)?;
+    if kept_at.checked_add(1)? >= lease.key().request {
+        return None;
+    }
+    lease.mark_forget_agreed(&OneFaceForgetYes(()), id);
+    eprintln!(
+        "lamp-voice second: request {request}: their plain yes, their face the one face in view, agrees to the forget the model asked about: it runs as the forget of their keep in request {kept_at}, not asked again (LAMP_ONE_FACE_FORGETS_ON_YES)"
+    );
+    Some(net::ToolCall {
+        id: call.id.clone(),
+        name: crate::remember::FORGET.to_owned(),
+        args: serde_json::json!({ "source_id": id }),
+        extra: None,
+    })
+}
+
 /// Whether `message` is the quiet note (`LAMP_KEEP_QUIETLY`,
 /// [`crate::keep_quietly::quiet_note`]) as told beside the person's words.
 fn is_quiet_note(message: &Message) -> bool {
@@ -23227,6 +23280,16 @@ async fn answer(
                 // With `LAMP_ONE_FACE_FORGETS_ON_YES`, their face alone in
                 // view: a forget of everything, of their face, a correction
                 // or a bare forget after their keep is held for their yes.
+                // Their plain yes to the model's own ask in words about their
+                // keep, and the model's bare forget on it: that call is the
+                // agreement, so it runs now as the forget of the kept id,
+                // asked once (row 8654 L2; CLAUDE.md rule 8: no second ask).
+                let agreed_now = if held_forget_ran {
+                    None
+                } else {
+                    agreed_on_face_yes(shared, request, (heard, &heard_words), call, scope.as_ref())
+                };
+                let call = agreed_now.as_ref().unwrap_or(call);
                 let everything_refused = call.name == crate::remember::FORGET_EVERYTHING
                     && !crate::remember::forget_unguarded()
                     && (everything_now == Some(false)

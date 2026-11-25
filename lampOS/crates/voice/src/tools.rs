@@ -209,6 +209,14 @@ pub(crate) fn one_face_just_kept_id(
     key: crate::memory_scope::RequestKey,
     person: &str,
 ) -> Option<u64> {
+    one_face_kept_mark(key, person).map(|(_, id)| id)
+}
+
+/// [`one_face_just_kept_id`] with the request that kept it: `(request, id)`.
+pub(crate) fn one_face_kept_mark(
+    key: crate::memory_scope::RequestKey,
+    person: &str,
+) -> Option<(u64, u64)> {
     let kept = ONE_FACE_KEPT.lock().ok()?;
     let (at, whose, when, id) = kept.iter().find(|(at, ..)| same_session(at, &key))?;
     (at.request < key.request
@@ -216,6 +224,7 @@ pub(crate) fn one_face_just_kept_id(
         && when.elapsed() <= crate::remember::HELD_FORGET_FOR)
         .then_some(*id)
         .flatten()
+        .map(|id| (at.request, id))
 }
 
 /// Whether a bare forget in request `key`, on a line `person`'s by the
