@@ -1813,6 +1813,7 @@ fn setup_starts_with_both_files_one_version_ahead() {
         .arg(&config)
         .arg("--plan")
         .arg(&plan_file)
+        .env(lamp_setup::reset::ROOT_ENV, &root.0)
         .output()
         .unwrap();
     assert!(out.status.success(), "{out:?}");
