@@ -1563,12 +1563,15 @@ pub(crate) fn set_test_default(default: Option<Option<EngineKind>>) {
     TEST_DEFAULT.with(|cell| cell.set(default));
 }
 
-/// Whether `engine`'s direct session takes the lamp's work now. OpenClaw's
-/// always (its gateway follows "in use", #8105). Any other engine's only
-/// while it is the lamp's default: lamp-update runs Hermes's gateway only
-/// then, so a task named for Hermes on an OpenClaw lamp keeps Harness's
-/// path instead of waiting for a gateway that never starts. No reader set
-/// (no lamp side): as before, it does.
+/// Whether `engine`'s direct session takes the lamp's work now. One agent
+/// per lamp: every lamp launch is prepared on the lamp's default engine
+/// (the engine the person names is not read), so this is only a guard for
+/// a launch prepared just before the app's default moved. OpenClaw's
+/// session always takes it, as before. Any other engine's only while it is
+/// the lamp's default: lamp-update runs Hermes's gateway only then, so a
+/// Hermes launch left from before a move to OpenClaw keeps Harness's path
+/// instead of waiting for a gateway that never starts. No reader set (no
+/// lamp side): as before, it does.
 fn serves_now(engine: EngineKind) -> bool {
     if engine == EngineKind::Openclaw {
         return true;
