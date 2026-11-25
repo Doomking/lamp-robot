@@ -12105,7 +12105,7 @@ async fn spoken(
         let asker = forget_asker(scope.as_ref());
         let _ = asked_just_before(
             &shared,
-            request,
+            (request, &text),
             true,
             forgets_asked(&text),
             asker.as_ref(),
@@ -16106,6 +16106,8 @@ struct SpokenBefore {
     asker: Option<(u64, String)>,
     at: Instant,
     asked: Vec<&'static str>,
+    /// Whether its words name a thing (`remember::named_subject`).
+    named: bool,
 }
 
 /// The forgets that `said` asks for and names: `forget_everything` and
@@ -16140,6 +16142,67 @@ struct HeldForgets {
     /// was held: its request, the faces seen speaking it and the known
     /// person with their face (`LAMP_EYES_SPEAKING=on`, #2377).
     sight: Option<SightRead>,
+    /// The latest requests whose model called anything, newest last, at
+    /// most [`CALLED_KEPT`] ([`note_called`]): a one-face yes runs a bare
+    /// forget at once only when none came between their keep and it
+    /// ([`agreed_on_face_yes`]).
+    called: std::collections::VecDeque<u64>,
+    /// The spoken line before the last one: its request, and whether its
+    /// words named a thing (`remember::named_subject`), for the one-face
+    /// yes ([`agreed_on_face_yes`]: a yes after "Forget my dentist note"
+    /// answered in words is never the forget of their last keep).
+    prior: Option<(u64, bool)>,
+}
+
+/// How many requests [`HeldForgets::called`] keeps: more than the lines a
+/// one-face keep's window (`remember::HELD_FORGET_FOR`) can hold between it
+/// and a yes is never needed, as an older one is past it.
+const CALLED_KEPT: usize = 8;
+
+/// Why a bare forget on their plain yes in `request` is not their agreement
+/// to forget the keep of `kept_at` ([`agreed_on_face_yes`]), if it isn't.
+fn agreed_yes_refused(shared: &Shared, kept_at: u64, request: u64) -> Option<&'static str> {
+    let asked = shared.lamp_said.lock().is_ok_and(|said| {
+        said.0 > kept_at
+            && said.0 < request
+            && crate::remember::asks_about_forgetting(&said.1, crate::remember::FORGET)
+    });
+    if !asked {
+        return Some("the lamp's last answer asked nothing about forgetting");
+    }
+    let unnamed = shared.held_forget.lock().is_ok_and(|hold| {
+        hold.prior
+            .is_some_and(|(at, named)| at > kept_at && at < request && !named)
+    });
+    if !unnamed {
+        return Some("the line the lamp answered named a thing, or is not known");
+    }
+    if called_between(shared, kept_at, request) {
+        return Some("a request between their keep and it called something");
+    }
+    None
+}
+
+/// Marks `request` as one whose model called something.
+fn note_called(shared: &Shared, request: u64) {
+    if let Ok(mut hold) = shared.held_forget.lock()
+        && hold.called.back() != Some(&request)
+    {
+        if hold.called.len() == CALLED_KEPT {
+            hold.called.pop_front();
+        }
+        hold.called.push_back(request);
+    }
+}
+
+/// Whether a request after `kept_at` and before `request` called anything,
+/// or the record of it may have been let go ([`HeldForgets::called`]).
+fn called_between(shared: &Shared, kept_at: u64, request: u64) -> bool {
+    let Ok(hold) = shared.held_forget.lock() else {
+        return true;
+    };
+    (hold.called.len() == CALLED_KEPT && hold.called.front().is_some_and(|first| *first > kept_at))
+        || hold.called.iter().any(|at| *at > kept_at && *at < request)
 }
 
 /// A line's request, the faces seen speaking it, and the known person's
@@ -18295,6 +18358,22 @@ fn agreed_on_face_yes(
     if kept_at.checked_add(1)? >= lease.key().request {
         return None;
     }
+    // Only a yes to the lamp's own question about forgetting their keep
+    // (the Reviewer-lead's must-fix and El's P2 on #8654): the lamp's last
+    // answer, after the keep, asked about forgetting
+    // (`remember::asks_about_forgetting`); the person's line it answered,
+    // the one before this yes, named nothing (`remember::named_subject`: "Forget
+    // my dentist note" answered in words is about another thing); and no
+    // request between the keep and this yes called anything (a keep, then
+    // "Want the forecast too?", then "Yes."). Otherwise the forget is held
+    // and asked, as before.
+    let why = agreed_yes_refused(shared, kept_at, request);
+    if let Some(why) = why {
+        eprintln!(
+            "lamp-voice second: request {request}: a bare forget on their plain yes is not run at once: {why} (LAMP_ONE_FACE_FORGETS_ON_YES)"
+        );
+        return None;
+    }
     lease.mark_forget_agreed(&OneFaceForgetYes(()), id);
     eprintln!(
         "lamp-voice second: request {request}: their plain yes, their face the one face in view, agrees to the forget the model asked about: it runs as the forget of their keep in request {kept_at}, not asked again (LAMP_ONE_FACE_FORGETS_ON_YES)"
@@ -18481,7 +18560,7 @@ fn settle_held_forget(shared: &Shared, request: u64, answer: Option<&str>) {
 /// nothing counts.
 fn asked_just_before(
     shared: &Shared,
-    request: u64,
+    (request, said): (u64, &str),
     heard: bool,
     asked: Vec<&'static str>,
     asker: Option<&(u64, String)>,
@@ -18498,11 +18577,13 @@ fn asked_just_before(
         return Vec::new();
     }
     let before = hold.before.take();
+    hold.prior = before.as_ref().map(|before| (before.request, before.named));
     hold.before = heard.then(|| SpokenBefore {
         request,
         asker: asker.cloned(),
         at: now,
         asked,
+        named: crate::remember::named_subject(said).is_some(),
     });
     match before {
         Some(before)
@@ -19438,7 +19519,7 @@ async fn answer(
     let asker = forget_asker(scope.as_ref());
     let asked_before = asked_just_before(
         shared,
-        request,
+        (request, &said),
         heard,
         forgets_asked(&said),
         asker.as_ref(),
@@ -22733,6 +22814,9 @@ async fn answer(
             // by its place, never by its name (#5326).
             let batch_start = turn_called.len();
             let mut batch_dropped = 0;
+            if !calls.is_empty() {
+                note_called(shared, request);
+            }
             turn_called.extend(
                 calls
                     .iter()

@@ -1636,8 +1636,14 @@ id vừa lưu (`tools::one_face_just_kept_id`, chỉ xem `ONE_FACE_KEPT`, lần 
 một mặt mới nhất của phiên, mà không lấy đi; một lệnh quên trần mô hình gọi
 trên câu chỉ là một lời «có» (`remember::heard::only_a_yes`), có một câu ở
 giữa nó và lần lưu (câu hỏi bằng lời của mô hình), là lời đồng ý của họ và
-chạy ngay như lệnh quên đúng id ấy, không hỏi lần hai:
-`second_provider::agreed_on_face_yes`; id
+chạy ngay như lệnh quên đúng id ấy, không hỏi lần hai, nhưng chỉ khi câu
+trả lời cuối của đèn sau lần lưu hỏi về việc quên
+(`remember::asks_about_forgetting` trên `Shared::lamp_said`), câu nó trả lời
+không nêu điều gì (`remember::named_subject`), và không lượt nào giữa lần lưu
+và lời «có» gọi gì (điều phải sửa của Reviewer-lead và P2 của El trên #8654:
+«Want the forecast too?» hay «Forget my dentist note.» được trả lời bằng lời,
+rồi «Yes.», thì vẫn giữ); nếu không thì giữ chờ và
+hỏi: `second_provider::agreed_on_face_yes`; id
 có nhờ `LAMP_MEMORY_REPLACES`; các lệnh của tuyến thứ hai chạy trong chính
 tiến trình worker của nó, nên dấu và lần xem là của cùng một tiến trình), và
 `forget_everything`, `forget_my_face` cùng một lệnh sửa (`remember` có

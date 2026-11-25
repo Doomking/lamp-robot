@@ -7072,7 +7072,12 @@ stands), and eyes that can't be reached at all name nobody, as before. Without a
   (`Quiet::held_keep`). A bare forget called on a line that is only a yes
   (`remember::heard::only_a_yes`), a line after the keep's next one, theirs
   by their face alone in view, runs at once as the forget of the kept id,
-  marked agreed, and is not asked again (`agreed_on_face_yes`). In
+  marked agreed, and is not asked again (`agreed_on_face_yes`), only when
+  the lamp's last answer after the keep asked about forgetting
+  (`remember::asks_about_forgetting`, `Shared::lamp_said`), the line it
+  answered named nothing (`HeldForgets::prior`, `remember::named_subject`)
+  and no request between the keep and the yes called anything
+  (`HeldForgets::called`); otherwise it is held and asked. In
   `take_held_forget` (`YesLine`), their plain yes within 60 s on such a
   line, no face seen speaking it, runs it, its person the line's own
   (`keep_asker`); a carried, sticky or gap-held yes line drops it as unseen,

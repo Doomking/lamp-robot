@@ -118,6 +118,11 @@ thread_local! {
     static REQUEST_BASE: std::cell::Cell<u64> = const { std::cell::Cell::new(0) };
 }
 
+/// One test at a time that reads a one-face keep's mark: the marks
+/// (`tools::ONE_FACE_KEPT`) are the process's, by worker and session, and
+/// these tests share both, so one's keep would stand for another's.
+static KEEP_MARK_TESTS: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
+
 /// The worker's own setup (`worker::see_who_speaks`) with
 /// `LAMP_SECOND_SPEAKING_FACE` on and `LAMP_PERSON_SCOPE_SEEN` as `seen`,
 /// whose eyes' reader fails to start: a relative bus root, which
@@ -7094,6 +7099,7 @@ fn held_call(case: &str) -> &'static str {
 #[tokio::test]
 async fn a_bare_forget_right_after_a_one_face_keep_asks_once_and_forgets_on_yes() {
     let a = crate::remember::person_id("A");
+    let _one = KEEP_MARK_TESTS.lock().await;
     KEEP_MARKS.with(|marks| marks.set(Some(91)));
     let mut chats = vec![
         vec![
@@ -7286,6 +7292,7 @@ async fn with_the_switch_off_the_mouth_still_gates_forgets_and_corrections() {
             assert!(refused_by_one_face(&got), "{case}: refused as stock");
         }
     }
+    let _one = KEEP_MARK_TESTS.lock().await;
     KEEP_MARKS.with(|marks| marks.set(Some(92)));
     let mut chats = one_call(
         crate::remember::REMEMBER,
@@ -7741,6 +7748,7 @@ fn row_8654_l2_chats() -> Vec<Vec<net::Result<ChatEvent>>> {
 /// yes runs nothing.
 #[tokio::test]
 async fn row_8654_l2_a_bare_forget_on_the_yes_after_a_word_ask_runs_at_once() {
+    let _one = KEEP_MARK_TESTS.lock().await;
     let a = crate::remember::person_id("A");
     for (at, in_view) in [
         ("alone", vec![("f1", false)]),
@@ -7787,6 +7795,98 @@ async fn row_8654_l2_a_bare_forget_on_the_yes_after_a_word_ask_runs_at_once() {
             );
         }
     }
+}
+
+/// A plain yes after their one-face keep, `between` the line between,
+/// answered `answer` (after a `recall` with `called`), and the model's bare
+/// forget on the yes: whether it ran, and whether it was held and asked.
+async fn bare_forget_on_a_later_yes(
+    what: &str,
+    between: &str,
+    answer: &'static str,
+    called: bool,
+) -> (bool, bool) {
+    let _one = KEEP_MARK_TESTS.lock().await;
+    KEEP_MARKS.with(|marks| marks.set(Some(94)));
+    let mut chats = one_call(
+        crate::remember::REMEMBER,
+        json!({"text": "Parking spot is B12."}),
+    );
+    if called {
+        chats.push(vec![
+            Ok(ChatEvent::ToolCalls(vec![call(
+                "w1",
+                crate::remember::RECALL,
+                json!({"query": "weather tomorrow"}),
+            )])),
+            Ok(ChatEvent::Done),
+        ]);
+    }
+    chats.push(vec![text(answer), Ok(ChatEvent::Done)]);
+    chats.extend(asks_then(
+        crate::remember::FORGET,
+        json!({}),
+        "Shall I forget that?",
+        0,
+    ));
+    let got = face_yes_chats(
+        what,
+        vec![
+            line(
+                "Remember my parking spot is B twelve.",
+                vec![("f1", false)],
+                0,
+            ),
+            line(between, vec![("f1", false)], 3),
+            line("Yes.", vec![("f1", false)], 3),
+        ],
+        chats,
+        true,
+    )
+    .await;
+    (
+        !ran_named(&got, crate::remember::FORGET).is_empty(),
+        held_told(&got, HELD),
+    )
+}
+
+/// The Reviewer-lead's must-fix on #8654 (comment 7167529440): their
+/// one-face keep, then "Want the forecast too?" after a call, then "Yes.",
+/// and the model wrongly calls a bare forget: held and asked, nothing run.
+/// So too when the lamp's answer asked nothing.
+#[tokio::test]
+async fn a_bare_forget_on_a_yes_to_the_forecast_is_held_not_run() {
+    for (at, answer, called) in [
+        ("forecast", "Sunny tomorrow. Want the forecast too?", true),
+        ("no-ask", "Sunny tomorrow.", false),
+    ] {
+        let (ran, held) = bare_forget_on_a_later_yes(
+            &format!("row-8654-must-fix-{at}"),
+            "What's the weather tomorrow?",
+            answer,
+            called,
+        )
+        .await;
+        assert!(!ran, "{at}: the keep is never forgotten on that yes");
+        assert!(held, "{at}: held and asked instead");
+    }
+}
+
+/// El's P2 on 45f6ce4a18: "Forget my dentist note." answered in words
+/// ("Shall I forget your dentist note?"), then "Yes." and a bare forget:
+/// never the forget of their last keep, the parking spot, but held and
+/// asked; nothing runs.
+#[tokio::test]
+async fn a_bare_forget_on_a_yes_after_a_named_forget_is_held_not_run() {
+    let (ran, held) = bare_forget_on_a_later_yes(
+        "row-8654-el-named",
+        "Forget my dentist note.",
+        "Shall I forget your dentist note?",
+        false,
+    )
+    .await;
+    assert!(!ran, "the parking spot is never forgotten on that yes");
+    assert!(held, "held and asked instead");
 }
 
 /// Set in the child process [`row_8654_l2_on_the_real_route`] runs in.

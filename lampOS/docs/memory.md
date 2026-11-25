@@ -935,8 +935,13 @@ forget of that kept id (`tools::one_face_just_kept_id`, a peek at
 `LAMP_MEMORY_REPLACES` tells; a bare forget the model calls on a line
 that is only a yes (`remember::heard::only_a_yes`), with a line between it
 and the keep (the model's own ask in words), is their agreement and runs at
-once as the forget of that id, never asked a second time:
-`second_provider::agreed_on_face_yes`; the second route's calls run in its own
+once as the forget of that id, never asked a second time, but only when
+the lamp's last answer after the keep asked about forgetting
+(`remember::asks_about_forgetting` on `Shared::lamp_said`), the line it
+answered named nothing (`remember::named_subject`), and no request between
+the keep and the yes called anything (the Reviewer-lead's must-fix and El's
+P2 on #8654: "Want the forecast too?" or "Forget my dentist note." answered
+in words, then "Yes.", keeps it); otherwise it is held and asked: `second_provider::agreed_on_face_yes`; the second route's calls run in its own
 worker's process, so the mark and the peek are the same process's), and so
 are `forget_everything`, `forget_my_face` and a correction (a `remember`
 with `replaces`), each as called (`second_provider::hold_on_face_yes`).
