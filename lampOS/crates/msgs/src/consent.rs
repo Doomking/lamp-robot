@@ -92,7 +92,7 @@ impl Kept {
 /// makes the face expressions yes, the room sounds yes, seen activity and
 /// health and crash reports default on. A kept `"no"` stays no and a file
 /// that can't be read stays off either way; off, a missing file is no, as
-/// before. Off unless set, in no unit (`docs/switches.md`).
+/// before. Off unless set; on in the product's units (`docs/switches.md`).
 pub const NOTICING_BY_DEFAULT: &str = "LAMP_NOTICING_BY_DEFAULT";
 
 /// `by` for a yes nobody gave: no file is kept and

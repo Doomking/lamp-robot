@@ -2504,7 +2504,7 @@ put back from it runs the previous `lamp-cloud`, which has none. A
   `/var/lib/lampos-cloud` (the later choice and the queue); the next setup
   asks again, default off.
 - **On by default, dark (#7767):** with `LAMP_NOTICING_BY_DEFAULT=on`
-  (switches.md; off unless set, in no unit), neither record there (setup's
+  (switches.md; off unless set, on in the product's units), neither record there (setup's
   and `lamp-cloud`'s own both not found) reads as a yes nobody gave, with
   no `by` and no time (`read_consent_or`; setup's status reads its record
   the same way, `kept_share_reports_or`). A kept `false`, setup's or the

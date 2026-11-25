@@ -31,7 +31,7 @@ lamp also says once when the opt-in is turned off.
 
 1. **The opt-in is off by default.** It is the owner's yes on that lamp,
    given in the app or spoken. `LAMP_NOTICING_BY_DEFAULT=on` (#7767,
-   switches.md; off unless set, in no unit) turns a missing
+   switches.md; off unless set, on in the product's units) turns a missing
    `seen-activity.json` into a yes nobody gave (`"by":"default"`, no
    time), by `lamp_msgs::consent::allowed`'s one rule, shared with face
    expressions, room sounds and health reports: exactly `"yes"` is on,
