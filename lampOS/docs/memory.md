@@ -926,22 +926,34 @@ confirmation tells the person what is removed, and the scope is
 single-user), the mouth no longer gates a forget or a correction on the
 second route.** On a line theirs by their own face alone in view, the mouth
 not seen and the line not carried, sticky, gap-held or narrowed
-(`ScopeLease::in_view_by_one_face`), a bare "forget that" right after their
-plain new keep is held as the forget of that kept id
-(`tools::one_face_just_kept_id`, a peek at `ONE_FACE_KEPT`, which keeps the
-id `LAMP_MEMORY_REPLACES` tells; the second route's calls run in its own
+(`ScopeLease::in_view_by_one_face`), a bare "forget that" after their plain new
+keep, on any later line of theirs in the same session within 60 s
+(`remember::HELD_FORGET_FOR`; row 8654 L2: the model asked "forget that"
+back in words and called the bare forget on their yes), is held as the
+forget of that kept id (`tools::one_face_just_kept_id`, a peek at
+`ONE_FACE_KEPT`, the session's latest one-face keep, which keeps the id
+`LAMP_MEMORY_REPLACES` tells; the second route's calls run in its own
 worker's process, so the mark and the peek are the same process's), and so
 are `forget_everything`, `forget_my_face` and a correction (a `remember`
 with `replaces`), each as called (`second_provider::hold_on_face_yes`).
 Nothing runs on the asking line; the model is told to ask once, by the held
 notes already in use (`held_forget_told`, `FORGET_EVERYTHING_ASKS`) or, for
-a correction, `HELD_CORRECTION_ASKS`, which never names the old fact. Their
+a correction, `HELD_CORRECTION_ASKS`, which never names the old fact; a
+held correction's round is no longer told `LAMP_KEEP_QUIETLY`'s quiet note
+("never ask whether you should"), and its ask is said as a carried keep's is
+(`Quiet::held_keep`; row 8654 L4: 2 of 2 asked nothing and were dropped).
+The lamp still says no ask of its own: a hold whose answer asks nothing is
+dropped (`settle_held_forget`). Their
 plain yes within 60 s on a later line theirs by their face alone in view,
 no face seen speaking it, runs exactly that call in their scope
 (`take_held_forget`, `HeldForget::face_yes`); its held run marks it agreed
 (`ScopeLease::mark_held_yes`, `mark_forget_agreed`), so it alone passes the
 one-face refusal and the memory route's correction check. The provider
-route has no hold and still answers `ONE_FACE_JUST_KEPT`. A carried line,
+route has no hold and answers `ONE_FACE_JUST_KEPT` ("when I can see you say
+it") only with the switch off or off such a line; with it on, there, it asks
+which (`ONE_FACE_BARE_FORGET`). With `LAMP_PRIVATE_ROOM` on, a named forget's
+yes runs by the private room's branch first, so this switch adds nothing to
+a named forget there. A carried line,
 a sticky or gap-held line, a second face, another's yes, a no, a late yes
 and a written turn are as before, and a carried line's yes never lets such
 a hold go.

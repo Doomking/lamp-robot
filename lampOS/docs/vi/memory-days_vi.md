@@ -1629,8 +1629,11 @@ không còn chặn lệnh quên hay lệnh sửa trên tuyến thứ hai.** Trê
 của họ vì chỉ mặt họ trong khung, không thấy miệng nói, và câu không được
 mang tiếp, không phải tên mắt giữ (sticky), không bị giữ vì khoảng trống hay
 bị thu hẹp (`ScopeLease::in_view_by_one_face`): một câu «forget that» trần
-ngay sau lần lưu mới của họ được giữ như lệnh quên đúng id vừa lưu
-(`tools::one_face_just_kept_id`, chỉ xem `ONE_FACE_KEPT` mà không lấy đi; id
+sau lần lưu mới của họ, ở bất kỳ câu nào sau đó của họ trong cùng phiên và
+trong 60 giây (`remember::HELD_FORGET_FOR`; row 8654 L2: mô hình hỏi lại
+bằng lời rồi gọi lệnh quên trần khi họ nói «có»), được giữ như lệnh quên đúng
+id vừa lưu (`tools::one_face_just_kept_id`, chỉ xem `ONE_FACE_KEPT`, lần lưu
+một mặt mới nhất của phiên, mà không lấy đi; id
 có nhờ `LAMP_MEMORY_REPLACES`; các lệnh của tuyến thứ hai chạy trong chính
 tiến trình worker của nó, nên dấu và lần xem là của cùng một tiến trình), và
 `forget_everything`, `forget_my_face` cùng một lệnh sửa (`remember` có
@@ -1638,13 +1641,20 @@ tiến trình worker của nó, nên dấu và lần xem là của cùng một t
 (`second_provider::hold_on_face_yes`). Không gì chạy trên câu hỏi; mô hình
 được bảo hỏi một lần bằng các ghi chú giữ chờ sẵn có (`held_forget_told`,
 `FORGET_EVERYTHING_ASKS`), hoặc với lệnh sửa là `HELD_CORRECTION_ASKS`, không
-bao giờ nêu điều cũ. Lời «có» rõ ràng của họ trong 60 giây ở một câu sau cũng
+bao giờ nêu điều cũ; vòng của một lệnh sửa đang giữ không còn được kèm ghi chú
+lưu lặng lẽ của `LAMP_KEEP_QUIETLY` («đừng bao giờ hỏi có nên lưu không»), và
+câu hỏi của nó được nói như của một lần lưu mang tiếp (`Quiet::held_keep`;
+row 8654 L4: 2 trên 2 lần không hỏi gì và bị bỏ). Đèn vẫn không tự nói câu hỏi
+nào: lệnh giữ mà câu trả lời không hỏi gì thì bị bỏ (`settle_held_forget`). Lời «có» rõ ràng của họ trong 60 giây ở một câu sau cũng
 là của họ vì chỉ mặt họ trong khung, không mặt nào được thấy nói câu ấy, chạy
 đúng lệnh ấy trong phạm vi của họ (`take_held_forget`, `HeldForget::face_yes`);
 lần chạy giữ chờ đánh dấu nó đã được đồng ý (`ScopeLease::mark_held_yes`,
 `mark_forget_agreed`), nên chỉ lệnh ấy qua được lệnh từ chối một mặt và bước
-kiểm tra lệnh sửa của tuyến bộ nhớ. Tuyến provider không có giữ chờ và vẫn trả
-`ONE_FACE_JUST_KEPT`. Câu được mang tiếp, câu sticky hay giữ vì khoảng trống,
+kiểm tra lệnh sửa của tuyến bộ nhớ. Tuyến provider không có giữ chờ và chỉ trả
+`ONE_FACE_JUST_KEPT` («khi thấy bạn nói») khi công tắc tắt hoặc không phải câu
+như vậy; khi bật, ở đó, nó hỏi điều nào (`ONE_FACE_BARE_FORGET`). Khi
+`LAMP_PRIVATE_ROOM` bật, lời «có» cho một lệnh quên có tên chạy theo nhánh
+phòng riêng trước, nên công tắc này không thêm gì cho lệnh quên có tên ở đó. Câu được mang tiếp, câu sticky hay giữ vì khoảng trống,
 một mặt thứ hai, lời «có» của người khác, một lời «không», lời «có» muộn và
 lượt viết vẫn như cũ, và lời «có» trên câu được mang tiếp không bao giờ thả một
 lệnh giữ như vậy. Rủi ro còn lại:

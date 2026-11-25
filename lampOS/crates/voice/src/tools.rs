@@ -197,9 +197,13 @@ pub(crate) fn one_face_kept_for_test(
 }
 
 /// The kept id of the keep a bare forget in request `key` is about, on a
-/// line `person`'s by the one-face rule ([`one_face_just_kept`]'s tests:
-/// the same worker and session, the request right after it, within
-/// [`crate::remember::HELD_FORGET_FOR`]), with its id known. Peeked, never
+/// line `person`'s by the one-face rule: the same worker and session, a
+/// request after it, the same person, within
+/// [`crate::remember::HELD_FORGET_FOR`], with its id known. Not only the
+/// request right after it (row 8654 L2, lamp-06c1: the model asked "forget
+/// that" back in words, and the bare forget it called on their yes, the
+/// keep's request + 2, was refused). The session's mark is its latest
+/// one-face keep, and a forget by what or which ends it. Peeked, never
 /// taken: the mark stays for the provider route's refusal.
 pub(crate) fn one_face_just_kept_id(
     key: crate::memory_scope::RequestKey,
@@ -207,7 +211,7 @@ pub(crate) fn one_face_just_kept_id(
 ) -> Option<u64> {
     let kept = ONE_FACE_KEPT.lock().ok()?;
     let (at, whose, when, id) = kept.iter().find(|(at, ..)| same_session(at, &key))?;
-    (at.request.checked_add(1) == Some(key.request)
+    (at.request < key.request
         && whose == person
         && when.elapsed() <= crate::remember::HELD_FORGET_FOR)
         .then_some(*id)
@@ -2540,7 +2544,15 @@ fn run_call_with_scope(
                                 "lamp-voice: request {request}: a bare forget on a one-face line is not run{}: nothing saw the mouth say it (LAMP_PERSON_SCOPE_ONE_FACE)",
                                 if just { ", right after their keep" } else { "" }
                             );
-                            let note = if just {
+                            // With `LAMP_ONE_FACE_FORGETS_ON_YES` their face
+                            // alone in view is enough for a forget on their
+                            // yes, so the mouth gate's "when I can see you say
+                            // it" is no longer true there: it asks which, as
+                            // any other bare forget does (row 8654 L2).
+                            let note = if just
+                                && !(crate::second_provider::one_face_forgets_on_yes()
+                                    && lease.in_view_by_one_face())
+                            {
                                 ONE_FACE_JUST_KEPT
                             } else {
                                 ONE_FACE_BARE_FORGET
@@ -8039,8 +8051,8 @@ mod tests {
     /// (`LAMP_MEMORY_REPLACES`), and the second route's peek at it
     /// ([`one_face_just_kept_id`]) takes nothing: the next request, the same
     /// session and person, finds it again, and so does the provider route's
-    /// [`one_face_just_kept`]. Another person, a later request or no id
-    /// finds none.
+    /// [`one_face_just_kept`]. A later request of theirs finds it too;
+    /// another person, the keep's own request or no id finds none.
     #[test]
     fn one_face_kept_stores_the_kept_id_and_peeking_takes_nothing() {
         let ann = crate::remember::person_id("Ann");
@@ -8060,7 +8072,12 @@ mod tests {
             one_face_just_kept_id(key(8_570_101), &crate::remember::person_id("Bo")),
             None
         );
-        assert_eq!(one_face_just_kept_id(key(8_570_102), &ann), None, "later");
+        assert_eq!(
+            one_face_just_kept_id(key(8_570_102), &ann),
+            Some(5),
+            "a later request of the same session and person (row 8654 L2)"
+        );
+        assert_eq!(one_face_just_kept_id(key(8_570_100), &ann), None, "itself");
         assert!(one_face_just_kept(key(8_570_101), &ann), "still marked");
         one_face_kept(key(8_570_100), ann.clone(), None);
         assert_eq!(one_face_just_kept_id(key(8_570_101), &ann), None, "no id");

@@ -7064,9 +7064,12 @@ stands), and eyes that can't be reached at all name nobody, as before. Without a
   by their face alone in view (`ScopeLease::in_view_by_one_face`) with the
   eyes reading who speaks: `forget_everything` (unless these words ask for
   less), `forget_my_face`, a correction (`remember` with `replaces`) and a
-  bare forget right after their one-face keep, as the forget of the kept id
+  bare forget after their one-face keep, on a later line of theirs in the
+  session within 60 s, as the forget of the kept id
   (`tools::one_face_just_kept_id`), each told the held notes in use or
-  `remember::HELD_CORRECTION_ASKS` (`HeldForget::face_yes`). In
+  `remember::HELD_CORRECTION_ASKS` (`HeldForget::face_yes`); a held
+  correction's round drops the quiet note and its ask is said
+  (`Quiet::held_keep`). In
   `take_held_forget` (`YesLine`), their plain yes within 60 s on such a
   line, no face seen speaking it, runs it, its person the line's own
   (`keep_asker`); a carried, sticky or gap-held yes line drops it as unseen,

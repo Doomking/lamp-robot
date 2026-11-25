@@ -8556,6 +8556,19 @@ pub fn days_from_environment() -> bool {
 
 static DAYS_MODE: OnceLock<bool> = OnceLock::new();
 static DAYS: OnceLock<Option<DaysClient>> = OnceLock::new();
+
+/// Days memory at `socket` for this test process, with `replaces` on as in
+/// the product (`LAMP_MEMORY_REPLACES`), so a keep is told its id. Once
+/// per process: a test calling it runs in a child process of its own.
+#[cfg(test)]
+pub(crate) fn days_for_test(socket: &Path) -> bool {
+    let _ = DAYS_MODE.set(true);
+    let Ok(client) = DaysClient::new(socket.to_path_buf()) else {
+        return false;
+    };
+    client.replaces.store(true, Ordering::Release);
+    DAYS.set(Some(client)).is_ok()
+}
 static FORGET_THREAD: AtomicBool = AtomicBool::new(false);
 /// The requests whose forget was done ([`forgetting_reply`]): at most
 /// [`FORGOTTEN_REPLIES`], the oldest let go first.

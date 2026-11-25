@@ -18254,6 +18254,16 @@ async fn ask_once_forget(
     }
 }
 
+/// Whether `message` is the quiet note (`LAMP_KEEP_QUIETLY`,
+/// [`crate::keep_quietly::quiet_note`]) as told beside the person's words.
+fn is_quiet_note(message: &Message) -> bool {
+    message.role == "system"
+        && message.words().is_some_and(|words| {
+            words == crate::keep_quietly::QUIET_NOTE
+                || words == crate::keep_quietly::QUIET_NOTE_UNSURE
+        })
+}
+
 /// With `LAMP_ONE_FACE_FORGETS_ON_YES` (the memory owner's ruling on
 /// #8570): on a spoken line its person's by their own known face alone in
 /// view, the mouth not seen saying it (`ScopeLease::in_view_by_one_face`),
@@ -23229,6 +23239,15 @@ async fn answer(
                     scope.as_ref(),
                     everything_refused,
                 ) {
+                    // A held correction asks to keep it the new way: its ask
+                    // is the code's own, as a carried keep's is, so it is
+                    // said (`Quiet::held_keep`), and the quiet note's "never
+                    // ask whether you should" is not told beside it (row
+                    // 8654 L4, lamp-06c1: 2 of 2 asked nothing and dropped).
+                    if crate::remember::corrects(&call.name, &call.args) {
+                        quiet.held_keep();
+                        messages.retain(|message| !is_quiet_note(message));
+                    }
                     messages.push(Message::tool(call.id.clone(), told.to_string()));
                     continue;
                 }

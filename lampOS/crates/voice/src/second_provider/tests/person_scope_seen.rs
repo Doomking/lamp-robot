@@ -7644,3 +7644,226 @@ fn the_held_run_alone_passes_one_face_refused() {
     assert!(one_face_refused(Some(&lease), &held), "switch off: refused");
     crate::second_provider::set_one_face_forgets_on_yes_for_test(None);
 }
+
+/// Row 8654 L4 (lamp-06c1, build 16102, 2 of 2): with `LAMP_KEEP_QUIETLY`
+/// and `LAMP_KEEP_QUIETLY_ONE_FACE` on, as in the product, a correction on
+/// their one-face line was held, and dropped at once as its answer asked
+/// nothing. The hold's round is told the quiet note's "never ask whether
+/// you should" no more, and the model's ask is said though the lamp
+/// offered once already in this talk (`Quiet::held_keep`), so the hold
+/// stands and their yes runs exactly the correction.
+#[tokio::test]
+async fn row_8654_l4_a_held_correction_is_asked_with_the_quiet_switches_on() {
+    crate::keep_quietly::set_on_for_test(true);
+    crate::keep_quietly::set_one_face_for_test(true);
+    let args = json!({"text": "Gym is on Ninth Street.", "replaces": 7});
+    let mut chats = vec![vec![
+        text("Want me to keep that for you?"),
+        Ok(ChatEvent::Done),
+    ]];
+    chats.extend(asks_then(
+        crate::remember::REMEMBER,
+        args.clone(),
+        "Shall I remember that instead?",
+        1,
+    ));
+    let got = face_yes_chats(
+        "row-8654-l4",
+        vec![
+            line("My gym is on Fourth Street.", vec![("f1", false)], 0),
+            line(CORRECTS, vec![("f1", false)], 3),
+            line("Yes.", vec![("f1", false)], 5),
+        ],
+        chats,
+        true,
+    )
+    .await;
+    crate::keep_quietly::set_on_for_test(false);
+    crate::keep_quietly::set_one_face_for_test(false);
+    let quiet = |message: &Message| {
+        message.role == "system"
+            && message.words().is_some_and(|words| {
+                words == crate::keep_quietly::QUIET_NOTE
+                    || words == crate::keep_quietly::QUIET_NOTE_UNSURE
+            })
+    };
+    assert!(
+        got.rounds.iter().flatten().any(quiet),
+        "the quiet switches are on for these lines: {:?}",
+        got.rounds
+    );
+    let after_hold: Vec<&Vec<Message>> = got
+        .rounds
+        .iter()
+        .filter(|round| {
+            round
+                .iter()
+                .any(|message| format!("{message:?}").contains("Not changed yet"))
+        })
+        .collect();
+    assert!(!after_hold.is_empty(), "held and told: {:?}", got.rounds);
+    assert!(
+        after_hold.iter().all(|round| !round.iter().any(quiet)),
+        "the hold's round is not told never to ask: {after_hold:?}"
+    );
+    assert_eq!(
+        ran_named(&got, crate::remember::REMEMBER),
+        [args],
+        "their yes runs the correction: {:?}",
+        got.labels
+    );
+}
+
+/// Row 8654 L2 (lamp-06c1, build 16102, tries 2 and 3): "Forget that." right
+/// after their one-face keep was asked back in words, the model calling
+/// nothing; on "Yes, please." it called a bare forget, the keep's request
+/// + 2, and it was refused as a bare forget. That forget is now held as the
+/// forget of the kept id, asked about once, and their next yes runs it.
+#[tokio::test]
+async fn row_8654_l2_a_bare_forget_on_the_yes_after_a_word_ask_is_held_and_runs() {
+    let a = crate::remember::person_id("A");
+    KEEP_MARKS.with(|marks| marks.set(Some(93)));
+    let mut chats = one_call(
+        crate::remember::REMEMBER,
+        json!({"text": "Parking spot is B12."}),
+    );
+    chats.push(vec![
+        text("Do you want me to forget your parking spot?"),
+        Ok(ChatEvent::Done),
+    ]);
+    chats.extend(asks_then(
+        crate::remember::FORGET,
+        json!({}),
+        "Shall I forget that?",
+        1,
+    ));
+    let got = face_yes_chats(
+        "row-8654-l2",
+        vec![
+            line(
+                "Remember my parking spot is B twelve.",
+                vec![("f1", false)],
+                0,
+            ),
+            line("Forget that.", vec![("f1", false)], 3),
+            line("Yes, please.", vec![("f1", false)], 3),
+            line("Yes.", vec![("f1", false)], 3),
+        ],
+        chats,
+        true,
+    )
+    .await;
+    assert!(held_told(&got, HELD), "held and asked: {:?}", got.rounds);
+    assert_eq!(
+        ran_named(&got, crate::remember::FORGET),
+        [json!({"source_id": 93})],
+        "{:?}",
+        got.labels
+    );
+    assert_eq!(got.calls, [Some(a.clone()), Some(a)], "A's keep and forget");
+}
+
+/// Set in the child process [`row_8654_l2_on_the_real_route`] runs in.
+const REAL_ROUTE_CHILD: &str = "LAMP_TEST_ROW_8654_REAL_ROUTE";
+
+/// El's lead on #8654 (20:23): the host tests faked the keep's mark
+/// (`KEEP_MARKS`), so only the row ran the real keep, mark and peek. Here
+/// the keep runs on the voice's own memory route against a Days memory
+/// with `LAMP_MEMORY_REPLACES` on, as on lamp-06c1, which marks the kept id
+/// (`tools::ONE_FACE_KEPT`); then L2 as the lamp saw it: "Forget that."
+/// answered in words, no call, and a bare forget, no source named, called
+/// on "Yes, please.": held as the forget of that id, and their next yes
+/// runs it. In a child process: the Days client is once per process.
+#[tokio::test]
+async fn row_8654_l2_on_the_real_route() {
+    const NAME: &str = "second_provider::tests::person_scope_seen::row_8654_l2_on_the_real_route";
+    if std::env::var(REAL_ROUTE_CHILD).is_err() {
+        let output = std::process::Command::new(std::env::current_exe().unwrap())
+            .args(["--exact", NAME, "--nocapture", "--test-threads=1"])
+            .env(REAL_ROUTE_CHILD, "1")
+            .output()
+            .unwrap();
+        let said = format!(
+            "{}\n{}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        );
+        assert!(output.status.success(), "{said}");
+        assert!(said.contains("1 passed"), "the child ran it: {said}");
+        return;
+    }
+    let base = 9_865_400;
+    let socket = memory_socket(base);
+    let stop = Arc::new(AtomicBool::new(false));
+    let (memory, serving) = memory_at(&socket, stop.clone());
+    assert!(crate::remember::days_for_test(&socket));
+    let real = Real {
+        socket: socket.clone(),
+        said: vec![
+            "Okay.",
+            "Do you want me to forget your parking spot?",
+            "Shall I forget that?",
+            "Done.",
+        ],
+        base,
+    };
+    let mut chats = one_call(
+        crate::remember::REMEMBER,
+        json!({"text": "Parking spot is B12."}),
+    );
+    chats.push(vec![
+        text("Do you want me to forget your parking spot?"),
+        Ok(ChatEvent::Done),
+    ]);
+    chats.extend(asks_then(
+        crate::remember::FORGET,
+        json!({}),
+        "Shall I forget that?",
+        1,
+    ));
+    crate::second_provider::set_one_face_forgets_on_yes_for_test(Some(true));
+    ONE_FACE_READS.with(|reads| reads.set(true));
+    crate::person::set_private_room_for_test(Some(false));
+    let got = lines_known(
+        "row-8654-real",
+        vec![
+            line(
+                "Remember my parking spot is B twelve.",
+                vec![("f1", false)],
+                0,
+            ),
+            line("Forget that.", vec![("f1", false)], 3),
+            line("Yes, please.", vec![("f1", false)], 3),
+            line("Yes.", vec![("f1", false)], 3),
+        ],
+        chats,
+        (BOOT, true, true),
+        None,
+        None,
+        true,
+        true,
+        None,
+        Voice::One,
+        (false, &[]),
+        |_, _| {},
+        (false, None, Some(&real)),
+    )
+    .await;
+    crate::person::set_private_room_for_test(None);
+    crate::second_provider::set_one_face_forgets_on_yes_for_test(None);
+    stop.store(true, Ordering::Release);
+    serving.join().unwrap();
+    let _ = std::fs::remove_file(&socket);
+    let memory = memory.lock().unwrap().clone();
+    assert!(
+        memory.iter().any(|ask| ask["op"] == "remember"),
+        "the keep reached the memory: {memory:?}"
+    );
+    assert!(held_told(&got, HELD), "held and asked: {:?}", got.rounds);
+    assert_eq!(
+        ran_named(&got, crate::remember::FORGET),
+        [json!({"source_id": 1})],
+        "the kept id's forget, on their yes alone: {:?}",
+        got.labels
+    );
+}
