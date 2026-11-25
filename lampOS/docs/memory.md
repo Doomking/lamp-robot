@@ -930,9 +930,17 @@ not seen and the line not carried, sticky, gap-held or narrowed
 keep, on any later line of theirs in the same session within 60 s
 (`remember::HELD_FORGET_FOR`; row 8654 L2: the model asked "forget that"
 back in words and called the bare forget on their yes), is held as the
-forget of that kept id (`tools::one_face_just_kept_id`, a peek at
+forget of that kept id (`second_provider::face_kept_id`: a peek at
 `ONE_FACE_KEPT`, the session's latest one-face keep, which keeps the id
-`LAMP_MEMORY_REPLACES` tells; a bare forget the model calls on a line
+`LAMP_MEMORY_REPLACES` tells, or else at the second route's own mark,
+`HeldForgets::kept`, set by `mark_kept_by_face` from a plain keep's told id on a
+line by their face alone in view and ended by any later memory call but a
+bare forget, as the memory route's mark is; row 8654 L2 at 2c7cdd0d21 on
+lamp-06c1: a bare forget right after a keep found no memory-route mark and was
+refused. A bare forget the hold does not take says which check refused it,
+in machine words only: `face-hold: refused: not_heard | no_sight | gap_held |
+not_one_face | named | no_mark | other_person | not_later | too_old | no_id`,
+and `face-hold: own_mark` when the second route's own mark held it; a bare forget the model calls on a line
 that is only a yes (`remember::heard::only_a_yes`), with a line between it
 and the keep (the model's own ask in words), is their agreement and runs at
 once as the forget of that id, never asked a second time, but only when

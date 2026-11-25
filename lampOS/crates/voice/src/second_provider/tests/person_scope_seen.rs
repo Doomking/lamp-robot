@@ -7804,7 +7804,7 @@ async fn bare_forget_on_a_later_yes(
     what: &str,
     between: &str,
     answer: &'static str,
-    called: bool,
+    called: Option<(&'static str, Value)>,
 ) -> (bool, bool) {
     let _one = KEEP_MARK_TESTS.lock().await;
     KEEP_MARKS.with(|marks| marks.set(Some(94)));
@@ -7812,13 +7812,9 @@ async fn bare_forget_on_a_later_yes(
         crate::remember::REMEMBER,
         json!({"text": "Parking spot is B12."}),
     );
-    if called {
+    if let Some((name, args)) = called {
         chats.push(vec![
-            Ok(ChatEvent::ToolCalls(vec![call(
-                "w1",
-                crate::remember::RECALL,
-                json!({"query": "weather tomorrow"}),
-            )])),
+            Ok(ChatEvent::ToolCalls(vec![call("w1", name, args)])),
             Ok(ChatEvent::Done),
         ]);
     }
@@ -7857,8 +7853,15 @@ async fn bare_forget_on_a_later_yes(
 #[tokio::test]
 async fn a_bare_forget_on_a_yes_to_the_forecast_is_held_not_run() {
     for (at, answer, called) in [
-        ("forecast", "Sunny tomorrow. Want the forecast too?", true),
-        ("no-ask", "Sunny tomorrow.", false),
+        (
+            "forecast",
+            "Sunny tomorrow. Want the forecast too?",
+            Some((
+                crate::remember::RECALL,
+                json!({"query": "weather tomorrow"}),
+            )),
+        ),
+        ("no-ask", "Sunny tomorrow.", None),
     ] {
         let (ran, held) = bare_forget_on_a_later_yes(
             &format!("row-8654-must-fix-{at}"),
@@ -7882,7 +7885,7 @@ async fn a_bare_forget_on_a_yes_after_a_named_forget_is_held_not_run() {
         "row-8654-el-named",
         "Forget my dentist note.",
         "Shall I forget your dentist note?",
-        false,
+        None,
     )
     .await;
     assert!(!ran, "the parking spot is never forgotten on that yes");
@@ -7983,4 +7986,165 @@ async fn row_8654_l2_on_the_real_route() {
             .any(|ask| ask["op"].as_str().is_some_and(|op| op.contains("forget"))),
         "the forget reached the memory: {memory:?}"
     );
+}
+
+const KEEP_THEN_FORGET_CHILD: &str = "LAMP_TEST_ROW_8654_KEEP_THEN_FORGET";
+
+/// Row 8654 L2 (lamp-06c1, build 16102, 2c7cdd0d21, 2 of 2), in its order:
+/// "Lamp, remember my parking spot is B twelve." kept as theirs by the
+/// one-face rule on the voice's own memory route, then "Lamp, forget
+/// that." on the next line, the model calling a bare forget at once. On
+/// the lamp that forget was not held: the memory route's mark of the keep
+/// (`tools::ONE_FACE_KEPT`) was not found, and the hold peeked only it.
+/// Here that mark is let go before the forget's line, as on the lamp, and
+/// the second route's own mark of the keep's told id holds it: asked once,
+/// and their "Yes." runs exactly the kept id's forget. With the product's
+/// switches the harness reads (`LAMP_PRIVATE_ROOM` on, the memory's
+/// `LAMP_MEMORY_REMEMBER_ONCE` and `LAMP_MEMORY_REPLACES`).
+#[tokio::test]
+async fn row_8654_l2_a_bare_forget_right_after_the_keep_is_held_on_the_real_route() {
+    const NAME: &str = "second_provider::tests::person_scope_seen::row_8654_l2_a_bare_forget_right_after_the_keep_is_held_on_the_real_route";
+    if std::env::var(KEEP_THEN_FORGET_CHILD).is_err() {
+        let output = std::process::Command::new(std::env::current_exe().unwrap())
+            .args(["--exact", NAME, "--nocapture", "--test-threads=1"])
+            .env(KEEP_THEN_FORGET_CHILD, "1")
+            .env(crate::remember::REMEMBER_ONCE_ENVIRONMENT, "on")
+            .output()
+            .unwrap();
+        let said = format!(
+            "{}\n{}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        );
+        assert!(output.status.success(), "{said}");
+        assert!(said.contains("1 passed"), "the child ran it: {said}");
+        assert!(
+            said.contains("face-hold: own_mark"),
+            "the journal says the second route's own mark held it: {said}"
+        );
+        return;
+    }
+    let base = 9_865_500;
+    let socket = memory_socket(base);
+    let stop = Arc::new(AtomicBool::new(false));
+    let (memory, serving) = memory_at(&socket, stop.clone());
+    assert!(crate::remember::days_for_test(&socket));
+    let real = Real {
+        socket: socket.clone(),
+        said: vec!["Okay.", "Shall I forget that?", "Done."],
+        base,
+    };
+    let mut chats = one_call(
+        crate::remember::REMEMBER,
+        json!({"text": "Parking spot is B12."}),
+    );
+    chats.extend(asks_then(
+        crate::remember::FORGET,
+        json!({}),
+        "Shall I forget that?",
+        2,
+    ));
+    crate::second_provider::set_one_face_forgets_on_yes_for_test(Some(true));
+    ONE_FACE_READS.with(|reads| reads.set(true));
+    crate::person::set_private_room_for_test(Some(true));
+    let got = lines_known(
+        "row-8654-keep-then-forget",
+        vec![
+            line(
+                "Lamp, remember my parking spot is B twelve.",
+                vec![("f1", false)],
+                0,
+            ),
+            line("Lamp, forget that.", vec![("f1", false)], 3),
+            line("Yes.", vec![("f1", false)], 3),
+        ],
+        chats,
+        (BOOT, true, true),
+        None,
+        None,
+        true,
+        true,
+        None,
+        Voice::One,
+        (false, &[]),
+        // The memory route's mark of the keep is gone by the forget's
+        // line, as on the lamp.
+        |line, _| {
+            if line == 2 {
+                crate::tools::one_face_kept_clear_for_test();
+            }
+        },
+        (false, None, Some(&real)),
+    )
+    .await;
+    crate::person::set_private_room_for_test(None);
+    crate::second_provider::set_one_face_forgets_on_yes_for_test(None);
+    stop.store(true, Ordering::Release);
+    serving.join().unwrap();
+    let _ = std::fs::remove_file(&socket);
+    let memory = memory.lock().unwrap().clone();
+    assert!(
+        memory.iter().any(|ask| ask["op"] == "remember"),
+        "the keep reached the memory: {memory:?}"
+    );
+    assert!(
+        held_told(&got, HELD),
+        "held and asked once: {:?}",
+        got.rounds
+    );
+    assert_eq!(
+        ran_named(&got, crate::remember::FORGET),
+        [json!({"source_id": 1})],
+        "only the kept id's forget, on their yes: {:?}",
+        got.labels
+    );
+    assert!(
+        memory
+            .iter()
+            .any(|ask| ask["op"].as_str().is_some_and(|op| op.contains("forget"))),
+        "the forget reached the memory: {memory:?}"
+    );
+}
+
+/// El's P3 4 at 2c7cdd0d21: condition (c) alone. Their one-face keep, then a
+/// line whose request called something, answered with an ask about
+/// forgetting, then "Yes.", and the model calls a bare forget: the ask and
+/// the unnamed line pass, but a call came between the keep and the yes, so
+/// it is held and asked, nothing run.
+#[tokio::test]
+async fn a_bare_forget_on_a_yes_after_a_call_between_is_held_not_run() {
+    let (ran, held) = bare_forget_on_a_later_yes(
+        "row-8654-p3-called",
+        "What's the weather tomorrow?",
+        "Sunny tomorrow. Shall I forget your parking spot?",
+        Some((
+            crate::remember::RECALL,
+            json!({"query": "weather tomorrow"}),
+        )),
+    )
+    .await;
+    assert!(!ran, "the keep is never forgotten on that yes");
+    assert!(held, "held and asked instead");
+}
+
+/// El's P3 2 at 2c7cdd0d21: "Want me to set a reminder so you don't
+/// forget?" reads as asking about forgetting
+/// (`remember::asks_about_forgetting`, its wording rules the owner's, left
+/// as they are). A reminder ask comes with a call: their one-face keep, a
+/// reminder set in between, that ask, then "Yes.", and the model calls a
+/// bare forget: held and asked, nothing run (condition (c)).
+#[tokio::test]
+async fn a_bare_forget_on_a_yes_to_a_reminder_offer_is_held_not_run() {
+    let (ran, held) = bare_forget_on_a_later_yes(
+        "row-8654-p3-reminder",
+        "I need to move the car at six.",
+        "Want me to set a reminder so you don't forget?",
+        Some((
+            "set_reminder",
+            json!({"text": "Move the car", "at": "18:00"}),
+        )),
+    )
+    .await;
+    assert!(!ran, "the keep is never forgotten on that yes");
+    assert!(held, "held and asked instead");
 }

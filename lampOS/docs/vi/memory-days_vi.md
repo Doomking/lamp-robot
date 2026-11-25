@@ -1632,8 +1632,17 @@ bị thu hẹp (`ScopeLease::in_view_by_one_face`): một câu «forget that» t
 sau lần lưu mới của họ, ở bất kỳ câu nào sau đó của họ trong cùng phiên và
 trong 60 giây (`remember::HELD_FORGET_FOR`; row 8654 L2: mô hình hỏi lại
 bằng lời rồi gọi lệnh quên trần khi họ nói «có»), được giữ như lệnh quên đúng
-id vừa lưu (`tools::one_face_just_kept_id`, chỉ xem `ONE_FACE_KEPT`, lần lưu
-một mặt mới nhất của phiên, mà không lấy đi; một lệnh quên trần mô hình gọi
+id vừa lưu (`second_provider::face_kept_id`: xem `ONE_FACE_KEPT`, lần lưu
+một mặt mới nhất của phiên, mà không lấy đi, hoặc nếu không có thì xem dấu
+riêng của tuyến thứ hai, `HeldForgets::kept`, do `mark_kept_by_face` đặt từ id
+được báo của một lần lưu thường trên câu chỉ có mặt họ trong khung hình, và
+mọi lệnh bộ nhớ sau đó trừ lệnh quên trần đều xóa nó như dấu của tuyến bộ
+nhớ; row 8654 L2 ở 2c7cdd0d21 trên lamp-06c1: một lệnh quên trần ngay sau lần
+lưu không thấy dấu của tuyến bộ nhớ và bị từ chối. Một lệnh quên trần không
+được giữ ghi vào nhật ký bước kiểm tra nào đã từ chối, chỉ bằng từ máy:
+`face-hold: refused: not_heard | no_sight | gap_held | not_one_face | named |
+no_mark | other_person | not_later | too_old | no_id`, và `face-hold: own_mark`
+khi dấu riêng giữ nó; một lệnh quên trần mô hình gọi
 trên câu chỉ là một lời «có» (`remember::heard::only_a_yes`), có một câu ở
 giữa nó và lần lưu (câu hỏi bằng lời của mô hình), là lời đồng ý của họ và
 chạy ngay như lệnh quên đúng id ấy, không hỏi lần hai, nhưng chỉ khi câu

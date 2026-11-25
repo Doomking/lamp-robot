@@ -135,7 +135,7 @@ const MAX_ANSWER_BYTES: u64 = 8_192;
 /// lamp asks them to look at it ([`ONE_FACE_JUST_KEPT`]). With
 /// `LAMP_MEMORY_REPLACES` the kept thing's id goes with it: with
 /// `LAMP_ONE_FACE_FORGETS_ON_YES`, the second route holds that bare forget
-/// as the forget of that id for their yes ([`one_face_just_kept_id`]). The
+/// as the forget of that id for their yes ([`one_face_kept_why`]). The
 /// second route's calls run in its own worker's process, on the thread that
 /// asks (`provider_worker::answered_scoped`), so the mark and its peek are
 /// the same process's.
@@ -205,6 +205,7 @@ pub(crate) fn one_face_kept_for_test(
 /// keep's request + 2, was refused). The session's mark is its latest
 /// one-face keep, and a forget by what or which ends it. Peeked, never
 /// taken: the mark stays for the provider route's refusal.
+#[cfg(test)]
 pub(crate) fn one_face_just_kept_id(
     key: crate::memory_scope::RequestKey,
     person: &str,
@@ -213,18 +214,44 @@ pub(crate) fn one_face_just_kept_id(
 }
 
 /// [`one_face_just_kept_id`] with the request that kept it: `(request, id)`.
+#[cfg(test)]
 pub(crate) fn one_face_kept_mark(
     key: crate::memory_scope::RequestKey,
     person: &str,
 ) -> Option<(u64, u64)> {
-    let kept = ONE_FACE_KEPT.lock().ok()?;
-    let (at, whose, when, id) = kept.iter().find(|(at, ..)| same_session(at, &key))?;
-    (at.request < key.request
-        && whose == person
-        && when.elapsed() <= crate::remember::HELD_FORGET_FOR)
-        .then_some(*id)
-        .flatten()
-        .map(|id| (at.request, id))
+    one_face_kept_why(key, person).ok()
+}
+
+/// [`one_face_kept_mark`], or why it gives nothing, in a journal's machine
+/// words (row 8654 L2: the hold refused with no line saying which check):
+/// `no_mark` (none this session), `other_person`, `not_later`, `too_old`
+/// or `no_id`.
+pub(crate) fn one_face_kept_why(
+    key: crate::memory_scope::RequestKey,
+    person: &str,
+) -> Result<(u64, u64), &'static str> {
+    let kept = ONE_FACE_KEPT.lock().map_err(|_| "no_mark")?;
+    let Some((at, whose, when, id)) = kept.iter().find(|(at, ..)| same_session(at, &key)) else {
+        return Err("no_mark");
+    };
+    if whose != person {
+        Err("other_person")
+    } else if at.request >= key.request {
+        Err("not_later")
+    } else if when.elapsed() > crate::remember::HELD_FORGET_FOR {
+        Err("too_old")
+    } else {
+        (*id).map(|id| (at.request, id)).ok_or("no_id")
+    }
+}
+
+/// Every [`ONE_FACE_KEPT`] mark let go, for a test of a keep the memory
+/// route left unmarked (row 8654 L2).
+#[cfg(test)]
+pub(crate) fn one_face_kept_clear_for_test() {
+    if let Ok(mut kept) = ONE_FACE_KEPT.lock() {
+        kept.clear();
+    }
 }
 
 /// Whether a bare forget in request `key`, on a line `person`'s by the

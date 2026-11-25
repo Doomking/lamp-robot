@@ -7066,7 +7066,14 @@ stands), and eyes that can't be reached at all name nobody, as before. Without a
   less), `forget_my_face`, a correction (`remember` with `replaces`) and a
   bare forget after their one-face keep, on a later line of theirs in the
   session within 60 s, as the forget of the kept id
-  (`tools::one_face_just_kept_id`), each told the held notes in use or
+  (`face_kept_id`: the memory route's `ONE_FACE_KEPT` mark, or else the
+  second route's own, `HeldForgets::kept`, set by `mark_kept_by_face` from a
+  plain keep's told id on a line by their face alone in view and ended by
+  any later memory call but a bare forget; row 8654 L2 at 2c7cdd0d21). A
+  bare forget not held journals which check refused it, in machine words
+  only (`face-hold: refused: not_heard | no_sight | gap_held | not_one_face
+  | named | no_mark | other_person | not_later | too_old | no_id`), and
+  `face-hold: own_mark` when the own mark held it. Each is told the held notes in use or
   `remember::HELD_CORRECTION_ASKS` (`HeldForget::face_yes`); a held
   correction's round drops the quiet note and its ask is said
   (`Quiet::held_keep`). A bare forget called on a line that is only a yes
