@@ -21,7 +21,7 @@
 
 ## 路线图
 - **P0（零硬件）**：LeLamp↔V2 集成清单（OPi 4 Pro 为上游原生板，无 SBC 移植项）；brain-sim 运动包络/折叠验证；中文语音路线选型（sim）。
-- **P1（硬件）**：采购（32 灯环 ≤79mm、UVC 摄像头、STS3215 12V C018、OrangePi 4 Pro 6GB、杰理双麦 ENC + C-Media 适配器、12V5A）；头部/底座结构改造；逐灯标定（BODY_POSES / zone.env / lean-CoG）。
+- **P1（硬件）**：采购（标准 32×WS2812B 灯环 外径104/内径90mm、UVC 摄像头、STS3215 12V C018、OrangePi 4 Pro 6GB、杰理双麦 ENC + C-Media 适配器、12V5A）；头部/底座结构改造；逐灯标定（BODY_POSES / zone.env / lean-CoG）。
 - **P2（语音）**：中文人格（重写 `lampOS/deploy/character/lamp.txt`，移除 "Always speak English" 规则）；own-keys 语音路线；自有技能。
 - **P3（电池）**：市电丢失检测 → 调用 V2 既有 fold-to-rest → 休眠（净新增，见 `product/battery/`）。
 
