@@ -934,13 +934,22 @@ forget of that kept id (`second_provider::face_kept_id`: a peek at
 `ONE_FACE_KEPT`, the session's latest one-face keep, which keeps the id
 `LAMP_MEMORY_REPLACES` tells, or else at the second route's own mark,
 `HeldForgets::kept`, set by `mark_kept_by_face` from a plain keep's told id on a
-line by their face alone in view and ended by any later memory call but a
-bare forget, as the memory route's mark is; row 8654 L2 at 2c7cdd0d21 on
+line by their face alone in view and ended by any memory call but a bare forget, the keep's own request
+included, as the memory route's mark is; row 8654 L2 at 2c7cdd0d21 on
 lamp-06c1: a bare forget right after a keep found no memory-route mark and was
-refused. A bare forget the hold does not take says which check refused it,
-in machine words only: `face-hold: refused: not_heard | no_sight | gap_held |
-not_one_face | named | no_mark | other_person | not_later | too_old | no_id`,
-and `face-hold: own_mark` when the second route's own mark held it; a bare forget the model calls on a line
+refused. A forget is bare with no `source_id` and either no
+`about` or one bare as `ask_once_forget` reads it (`second_provider::bare_forget`,
+`remember::pick_forget` giving `Last`), so
+an `about` of `""`, `[]` or a guess not heard is bare too (row 8654 L2 at
+6c76c3257f: the model's `about` of 0 words was let go with no line). With the
+switch on, a forget of any kind or a correction the hold does not take says
+which check let it go, in machine words only: `face-hold: refused:
+no_scope | not_heard | no_sight | gap_held | not_one_face | named | not_bare |
+everything_refused | no_mark | other_person | not_later | too_old | no_id |
+one_waits | stale (<call>)`; `face-hold: own_mark` when the second route's
+own mark held it; and a held call dropped because the lamp's answer asked
+nothing (row 8654 L4) also says `face-hold: dropped: no_ask | unfinished
+(<call>)`; a bare forget the model calls on a line
 that is only a yes (`remember::heard::only_a_yes`), with a line between it
 and the keep (the model's own ask in words), is their agreement and runs at
 once as the forget of that id, never asked a second time, but only when

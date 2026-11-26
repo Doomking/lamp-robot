@@ -1636,13 +1636,20 @@ id vừa lưu (`second_provider::face_kept_id`: xem `ONE_FACE_KEPT`, lần lưu
 một mặt mới nhất của phiên, mà không lấy đi, hoặc nếu không có thì xem dấu
 riêng của tuyến thứ hai, `HeldForgets::kept`, do `mark_kept_by_face` đặt từ id
 được báo của một lần lưu thường trên câu chỉ có mặt họ trong khung hình, và
-mọi lệnh bộ nhớ sau đó trừ lệnh quên trần đều xóa nó như dấu của tuyến bộ
+mọi lệnh bộ nhớ trừ lệnh quên trần, kể cả trong chính lượt của lần lưu, đều xóa nó như dấu của tuyến bộ
 nhớ; row 8654 L2 ở 2c7cdd0d21 trên lamp-06c1: một lệnh quên trần ngay sau lần
-lưu không thấy dấu của tuyến bộ nhớ và bị từ chối. Một lệnh quên trần không
-được giữ ghi vào nhật ký bước kiểm tra nào đã từ chối, chỉ bằng từ máy:
-`face-hold: refused: not_heard | no_sight | gap_held | not_one_face | named |
-no_mark | other_person | not_later | too_old | no_id`, và `face-hold: own_mark`
-khi dấu riêng giữ nó; một lệnh quên trần mô hình gọi
+lưu không thấy dấu của tuyến bộ nhớ và bị từ chối. Một lệnh quên là trần khi không có
+`source_id` và hoặc không có `about`, hoặc `about` là trần theo đúng cách `ask_once_forget` đọc (`second_provider::bare_forget`,
+`remember::pick_forget` cho `Last`), nên `about` là `""`, `[]` hay một đoán
+không được nghe cũng là trần (row 8654 L2 ở 6c76c3257f: `about` 0 từ của mô
+hình bị bỏ qua không một dòng nhật ký). Khi công tắc bật, một lệnh quên bất kỳ
+hay một lệnh sửa không được giữ ghi vào nhật ký bước kiểm tra nào đã bỏ nó,
+chỉ bằng từ máy: `face-hold: refused: no_scope | not_heard | no_sight |
+gap_held | not_one_face | named | not_bare | everything_refused | no_mark |
+other_person | not_later | too_old | no_id | one_waits | stale (<call>)`;
+`face-hold: own_mark` khi dấu riêng giữ nó; và một lệnh đang giữ bị bỏ vì
+câu trả lời của đèn không hỏi gì (row 8654 L4) cũng ghi `face-hold: dropped:
+no_ask | unfinished (<call>)`; một lệnh quên trần mô hình gọi
 trên câu chỉ là một lời «có» (`remember::heard::only_a_yes`), có một câu ở
 giữa nó và lần lưu (câu hỏi bằng lời của mô hình), là lời đồng ý của họ và
 chạy ngay như lệnh quên đúng id ấy, không hỏi lần hai, nhưng chỉ khi câu

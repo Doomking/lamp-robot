@@ -7069,11 +7069,19 @@ stands), and eyes that can't be reached at all name nobody, as before. Without a
   (`face_kept_id`: the memory route's `ONE_FACE_KEPT` mark, or else the
   second route's own, `HeldForgets::kept`, set by `mark_kept_by_face` from a
   plain keep's told id on a line by their face alone in view and ended by
-  any later memory call but a bare forget; row 8654 L2 at 2c7cdd0d21). A
-  bare forget not held journals which check refused it, in machine words
-  only (`face-hold: refused: not_heard | no_sight | gap_held | not_one_face
-  | named | no_mark | other_person | not_later | too_old | no_id`), and
-  `face-hold: own_mark` when the own mark held it. Each is told the held notes in use or
+  any memory call but a bare forget, the keep's own request included, as
+  the memory route's mark is; row 8654 L2 at 2c7cdd0d21). A
+  forget is bare with no `source_id` and either no `about` or one bare as
+  `ask_once_forget` reads it (`bare_forget`,
+  `remember::pick_forget`: an `about` of `""`, `[]` or a guess not heard is
+  bare; row 8654 L2 at 6c76c3257f). With the switch on, a forget of any kind
+  or a correction not held journals which check let it go, in machine words
+  only (`face-hold: refused: no_scope | not_heard | no_sight | gap_held |
+  not_one_face | named | not_bare | everything_refused | no_mark |
+  other_person | not_later | too_old | no_id | one_waits | stale (<call>)`),
+  `face-hold: own_mark` when the own mark held it, and `face-hold: dropped:
+  no_ask | unfinished (<call>)` when a hold is dropped for an answer that
+  asked nothing (row 8654 L4). Each is told the held notes in use or
   `remember::HELD_CORRECTION_ASKS` (`HeldForget::face_yes`); a held
   correction's round drops the quiet note and its ask is said
   (`Quiet::held_keep`). A bare forget called on a line that is only a yes

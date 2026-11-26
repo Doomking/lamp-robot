@@ -8148,3 +8148,319 @@ async fn a_bare_forget_on_a_yes_to_a_reminder_offer_is_held_not_run() {
     assert!(!ran, "the keep is never forgotten on that yes");
     assert!(held, "held and asked instead");
 }
+
+/// Runs test `name` again, alone, in a child process with `key` set, for a
+/// test whose memory client or marks are the process's own: what the child
+/// said, once it passed. `None` in that child, which runs the test.
+fn in_child(name: &str, key: &str) -> Option<String> {
+    if std::env::var(key).is_ok() {
+        return None;
+    }
+    let output = std::process::Command::new(std::env::current_exe().unwrap())
+        .args(["--exact", name, "--nocapture", "--test-threads=1"])
+        .env(key, "1")
+        .output()
+        .unwrap();
+    let said = format!(
+        "{}\n{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(output.status.success(), "{said}");
+    assert!(said.contains("1 passed"), "the child ran it: {said}");
+    Some(said)
+}
+
+/// `lines` said on the voice's own memory route (a Days memory answering
+/// every ask kept, id 1), the switch on, reads on, the private room on (the
+/// product), with `known_at` before each line: what the lamp did, and the
+/// asks the memory was sent.
+async fn on_the_real_route(
+    what: &str,
+    base: u64,
+    lines: Vec<Line>,
+    chats: Vec<Vec<net::Result<ChatEvent>>>,
+    said: Vec<&'static str>,
+    known_at: fn(u64, &std::path::Path),
+) -> (Outcome, Vec<Value>) {
+    let socket = memory_socket(base);
+    let stop = Arc::new(AtomicBool::new(false));
+    let (memory, serving) = memory_at(&socket, stop.clone());
+    assert!(crate::remember::days_for_test(&socket));
+    let real = Real {
+        socket: socket.clone(),
+        said,
+        base,
+    };
+    crate::second_provider::set_one_face_forgets_on_yes_for_test(Some(true));
+    ONE_FACE_READS.with(|reads| reads.set(true));
+    crate::person::set_private_room_for_test(Some(true));
+    let got = lines_known(
+        what,
+        lines,
+        chats,
+        (BOOT, true, true),
+        None,
+        None,
+        true,
+        true,
+        None,
+        Voice::One,
+        (false, &[]),
+        known_at,
+        (false, None, Some(&real)),
+    )
+    .await;
+    crate::person::set_private_room_for_test(None);
+    crate::second_provider::set_one_face_forgets_on_yes_for_test(None);
+    stop.store(true, Ordering::Release);
+    serving.join().unwrap();
+    let _ = std::fs::remove_file(&socket);
+    let memory = memory.lock().unwrap().clone();
+    (got, memory)
+}
+
+/// Whether the memory was sent a forget of any kind.
+fn memory_forgot(memory: &[Value]) -> bool {
+    memory
+        .iter()
+        .any(|ask| ask["op"].as_str().is_some_and(|op| op.contains("forget")))
+}
+
+/// El's P2 1 at 6c76c3257f: their one-face keep, then a recall in the same
+/// request ("that" may now be what it read: Thirteen's P2 on #5022, the
+/// memory route's mark ends there too), then "Lamp, forget that." and
+/// "Yes.": the keep is never forgotten. The second route's own mark ends on
+/// any memory call but a bare forget, its own request included.
+#[tokio::test]
+async fn a_recall_in_the_keeps_own_request_ends_the_own_mark() {
+    const NAME: &str = "second_provider::tests::person_scope_seen::a_recall_in_the_keeps_own_request_ends_the_own_mark";
+    if let Some(said) = in_child(NAME, "LAMP_TEST_ROW_8654_SAME_REQUEST_RECALL") {
+        assert!(
+            !said.contains("face-hold: own_mark"),
+            "no own mark after the recall: {said}"
+        );
+        return;
+    }
+    let mut chats = vec![
+        vec![
+            Ok(ChatEvent::ToolCalls(vec![call(
+                "k1",
+                crate::remember::REMEMBER,
+                json!({"text": "Parking spot is B12."}),
+            )])),
+            Ok(ChatEvent::Done),
+        ],
+        vec![
+            Ok(ChatEvent::ToolCalls(vec![call(
+                "r1",
+                crate::remember::RECALL,
+                json!({"query": "car"}),
+            )])),
+            Ok(ChatEvent::Done),
+        ],
+        vec![text("Okay. Your car is the blue one."), Ok(ChatEvent::Done)],
+    ];
+    chats.extend(asks_then(
+        crate::remember::FORGET,
+        json!({}),
+        "Shall I forget that?",
+        2,
+    ));
+    let (got, memory) = on_the_real_route(
+        "row-8654-same-request-recall",
+        9_865_600,
+        vec![
+            line(
+                "Lamp, remember my parking spot is B twelve, and what car do I have?",
+                vec![("f1", false)],
+                0,
+            ),
+            line("Lamp, forget that.", vec![("f1", false)], 3),
+            line("Yes.", vec![("f1", false)], 3),
+        ],
+        chats,
+        vec![
+            "Okay. Your car is the blue one.",
+            "Shall I forget that?",
+            "Done.",
+        ],
+        |_, _| {},
+    )
+    .await;
+    assert!(
+        memory.iter().any(|ask| ask["op"] == "remember"),
+        "the keep reached the memory: {memory:?}"
+    );
+    assert!(
+        !ran_named(&got, crate::remember::FORGET).contains(&json!({"source_id": 1})),
+        "the keep is never forgotten: {:?}",
+        got.labels
+    );
+    assert!(!memory_forgot(&memory), "nothing forgotten: {memory:?}");
+}
+
+/// El's P2 2 (b) at 6c76c3257f: their one-face keep, then a recall on a
+/// later line, then "Lamp, forget that." and "Yes.": the recall ended both
+/// marks, so the keep is never forgotten.
+#[tokio::test]
+async fn a_recall_on_a_later_line_ends_the_own_mark() {
+    const NAME: &str =
+        "second_provider::tests::person_scope_seen::a_recall_on_a_later_line_ends_the_own_mark";
+    if let Some(said) = in_child(NAME, "LAMP_TEST_ROW_8654_LATER_RECALL") {
+        assert!(
+            !said.contains("face-hold: own_mark"),
+            "no own mark after the recall: {said}"
+        );
+        return;
+    }
+    let mut chats = one_call(
+        crate::remember::REMEMBER,
+        json!({"text": "Parking spot is B12."}),
+    );
+    chats.extend(one_call(crate::remember::RECALL, json!({"query": "car"})));
+    chats.extend(asks_then(
+        crate::remember::FORGET,
+        json!({}),
+        "Shall I forget that?",
+        2,
+    ));
+    let (got, memory) = on_the_real_route(
+        "row-8654-later-recall",
+        9_865_800,
+        vec![
+            line(
+                "Lamp, remember my parking spot is B twelve.",
+                vec![("f1", false)],
+                0,
+            ),
+            line("Lamp, what car do I have?", vec![("f1", false)], 3),
+            line("Lamp, forget that.", vec![("f1", false)], 3),
+            line("Yes.", vec![("f1", false)], 3),
+        ],
+        chats,
+        vec!["Okay.", "Okay.", "Shall I forget that?", "Done."],
+        |_, _| {},
+    )
+    .await;
+    assert!(
+        !ran_named(&got, crate::remember::FORGET).contains(&json!({"source_id": 1})),
+        "the keep is never forgotten: {:?}",
+        got.labels
+    );
+    assert!(!memory_forgot(&memory), "nothing forgotten: {memory:?}");
+}
+
+/// El's P2 2 (a) at 6c76c3257f: a keep on a line from a name the eyes hold
+/// (`LAMP_FACE_STICKY`, not their face alone in view), then "Lamp, forget
+/// that." by their face alone in view and "Yes.": the second route's own
+/// mark is set only on a line by their face alone in view, so nothing is
+/// forgotten. The memory route's mark is let go before the forget's line,
+/// so only the own mark is tried.
+#[tokio::test]
+async fn a_sticky_keep_sets_no_own_mark() {
+    const NAME: &str = "second_provider::tests::person_scope_seen::a_sticky_keep_sets_no_own_mark";
+    if let Some(said) = in_child(NAME, "LAMP_TEST_ROW_8654_STICKY_KEEP") {
+        assert!(
+            !said.contains("face-hold: own_mark"),
+            "no own mark from a sticky keep: {said}"
+        );
+        return;
+    }
+    fn sticky_first(line: u64) -> Option<bool> {
+        Some(line == 1)
+    }
+    STICKY.with(|sticky| sticky.set(true));
+    NAMED_LINES.with(|lines| lines.set(Some(sticky_first)));
+    let mut chats = one_call(
+        crate::remember::REMEMBER,
+        json!({"text": "Parking spot is B12."}),
+    );
+    chats.extend(asks_then(
+        crate::remember::FORGET,
+        json!({}),
+        "Shall I forget that?",
+        2,
+    ));
+    let (got, memory) = on_the_real_route(
+        "row-8654-sticky-keep",
+        9_865_900,
+        vec![
+            line(
+                "Lamp, remember my parking spot is B twelve.",
+                vec![("f1", false)],
+                0,
+            ),
+            line("Lamp, forget that.", vec![("f1", false)], 3),
+            line("Yes.", vec![("f1", false)], 3),
+        ],
+        chats,
+        vec!["Okay.", "Shall I forget that?", "Done."],
+        |line, _| {
+            if line == 2 {
+                crate::tools::one_face_kept_clear_for_test();
+            }
+        },
+    )
+    .await;
+    assert!(
+        memory.iter().any(|ask| ask["op"] == "remember"),
+        "the sticky line's keep reached the memory: {memory:?}"
+    );
+    assert!(
+        !ran_named(&got, crate::remember::FORGET).contains(&json!({"source_id": 1})),
+        "the keep is never forgotten: {:?}",
+        got.labels
+    );
+    assert!(!memory_forgot(&memory), "nothing forgotten: {memory:?}");
+}
+
+/// Row 8654 L2 at 6c76c3257f (lamp-06c1, 4 of 4): "Lamp, forget that."
+/// right after their one-face keep, the model's bare forget carrying an
+/// `about` of `""` (0 words) or `[]`. `ask_once_forget` read it as bare,
+/// but the hold took it as named and let it go with no line. The hold now
+/// reads a bare forget as `ask_once_forget` does (`remember::pick_forget`):
+/// held as the forget of the kept id, asked once, and their "Yes." runs
+/// exactly that.
+#[tokio::test]
+async fn a_bare_forget_with_an_empty_about_is_held_as_bare() {
+    let _one = KEEP_MARK_TESTS.lock().await;
+    for (at, about) in [("empty", json!("")), ("list", json!([]))] {
+        KEEP_MARKS.with(|marks| marks.set(Some(95)));
+        let mut chats = one_call(
+            crate::remember::REMEMBER,
+            json!({"text": "Parking spot is B12."}),
+        );
+        chats.extend(asks_then(
+            crate::remember::FORGET,
+            json!({ "about": about }),
+            "Shall I forget that?",
+            1,
+        ));
+        let got = face_yes_chats(
+            &format!("row-8654-about-{at}"),
+            vec![
+                line(
+                    "Lamp, remember my parking spot is B twelve.",
+                    vec![("f1", false)],
+                    0,
+                ),
+                line("Lamp, forget that.", vec![("f1", false)], 3),
+                line("Yes.", vec![("f1", false)], 3),
+            ],
+            chats,
+            true,
+        )
+        .await;
+        assert!(
+            held_told(&got, HELD),
+            "{at}: held and asked once: {:?}",
+            got.rounds
+        );
+        assert_eq!(
+            ran_named(&got, crate::remember::FORGET),
+            [json!({"source_id": 95})],
+            "{at}: their yes runs the kept id's forget"
+        );
+    }
+}
