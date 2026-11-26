@@ -9,6 +9,9 @@
 - `LAMP_VOICE_ROUTE` 缺省/`gemini` = Gemini Live（默认）；`second` = 产品三段式 Deepgram STT → DeepSeek LLM → ElevenLabs TTS（需 LAMP_VOICE_SECOND_CONFIG）。合法值仅 gemini|second。
 - `LAMP_OWN_KEYS=on` → DeepSeek+Deepgram+ElevenLabs 全自有 key，零 relay 依赖。
 
+## 麦克风（已定，2026-11-26）
+锁定上游拓扑：**杰理双麦 ENC（48kHz mono）+ C-Media USB 适配器**，采集 16kHz（`lampOS/docs/hardware.md`）。弃 LeLamp ReSpeaker Hat。
+
 ## 待决策（用户在中国）
 1. **Gemini Live own-key**：最快，但 Google 国内访问风险；
 2. **产品三段式 own-keys**：DeepSeek 国内 OK，Deepgram/ElevenLabs 海外弱链；

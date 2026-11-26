@@ -10,4 +10,4 @@ V2 body **无实测配置拒绝启动**：
 
 ## 参考
 - `lampOS/deploy/units/README.md` — 部分部署原则："Leave out what the lamp does not run. A part that is not there is not waited for."
-- 逐灯模板占位符：@NAME@ / @SERVO_DEVICE@ / @CAMERA_DEVICE@ / @FAST_CPUS@（Pi5 移植时填）。
+- 逐灯模板占位符：@NAME@ / @SERVO_DEVICE@ / @CAMERA_DEVICE@ / @FAST_CPUS@（部署时逐灯填；A733 大核 = 2×A76）。

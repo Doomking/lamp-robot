@@ -9,9 +9,10 @@
 ## 计划结构改造（硬件适配 V2，而非改 V2 适配硬件）
 1. **头部前脸**：LeLamp 原 = 104×79mm 矩形脸 + 8×5 LED 矩阵（README 写 24 颗，BOM 40 颗，不一致）；V2 = **32-LED 圆环 + 中心摄像头**（"ring of light around the camera is its eye"，眨眼=收环、注视=弧指向人）。需重新设计：环座（环外径 ≤79mm 以落入现有包络）+ 中心摄像头凸台 + **环形匀光板**（替代原矩形扩散板）。
 2. **摄像头**：Pi CSI/libcamera → **UVC USB**（V2 camera crate 只认 V4L2 MJPG，1280×960）。USB 走臂内布线：原 head↔base 为剥皮以太网线 8 芯，有备用线对。
-3. **底座**：Pi Zero 2 W → **Pi5**（Zero2W 4×A53@1GHz/512MB 大概率跑不动 V2 全栈，待核）；腔体 160×190×40mm 需复核。供电改 **12V5A 单电源**（舵机/功放 12V + MP2482 降压 5V3A 供板/环/风扇）。原 5V 舵机轨欠压欠流（STS3215 需 ≥6V）。
+3. **底座**：Pi Zero 2 W → **OrangePi 4 Pro 6GB**（lampOS 上游原生板，Allwinner A733：2×A76@2.0GHz + 6×A55，3TOPS NPU 可选；89×56mm，腔体 160×190×40mm 可容纳，需 mounting 转接板）。供电改 **12V5A 单电源**（舵机/功放 12V + MP2482 降压 5V3A 供板/环/风扇）；OPi 供电为 5V3A Type-C 非 PD，与降压输出正好匹配，且无 Pi5 非 PD 电源下 USB 总限流 600mA 的问题。原 5V 舵机轨欠压欠流（STS3215 需 ≥6V）。
 4. **舵机**：保留 5× Feetech STS3215 + Waveshare USB 适配器（ID1-5：base_yaw/base_pitch/elbow_pitch/wrist_roll/wrist_pitch，1M baud，/dev/ttyACM0）。推荐 **12V C018 版（30kg·cm）** 对齐 lampOS；国产便宜 C001 7.4V（19.5kg·cm）在最坏水平肩位 ~22kg·cm 下裕量 <1（估算，待核）。
 5. **电池**：小容量高倍率电芯，仅保活 + 断电兜底归位，见 `../product/battery/`。
+6. **麦克风**：弃 ReSpeaker Hat（I2S 阵列，与 V2 不符）→ 锁定上游拓扑 **杰理双麦 ENC（48kHz mono）+ C-Media USB 适配器**（采集 16kHz，`lampOS/docs/hardware.md`），USB 接入零驱动适配。
 
 ## 不变项
 臂连杆几何、舵机 ID/接线协议、折叠收纳概念。
