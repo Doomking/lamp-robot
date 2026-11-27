@@ -33,8 +33,23 @@ qpos0 = CAD 零位已视觉验证（idle 帧 1682 → 潜望镜 idle，头部 z�
 ## rest0（P0-② 仿真选定）
 模型角度 (pitch, elbow, wrist) = (−18°, +14°, −45°)，yaw=roll=0。
 CSV 归一化等价 ≈ **(0, −51.0, −15.6, 0, +50.0)**。
-头部 z 193mm、CoG 56.4mm、倾倒裕量 45.2mm、重力保持 6.11/6.56/0.71 kg·cm。
-→ 填入 BODY_POSES rest；**正常静息保持力矩，不 release**（详见 ../p0-2-torque-rest.md）。
+头部 z 193mm（xpos）；CoG off_axis **69.8mm（无配重）/ 45.3mm（500g 配重）**，
+margin +33.4 / +55.0（2026-11-27 修正，见 ../p0-2-cog-correction.md；旧 56.4/45.2 作废）；
+重力保持 6.11/6.56/0.71 kg·cm。
+→ 填入 BODY_POSES rest；正常静息力矩保持，上游只在 strain 坐下后释放
+（500g 配重下 rest0 释放安全 +29.4，见 ../p0-2-cog-correction.md §7）。
+
+## lean JSON（P1-c 生成，2026-11-27）
+
+`gen_lean_json.py` 从 `hardware/simulation/robot.xml`（内存重父级，不改上游文件）
++ P0 质量模型生成 lamp-lean 几何：
+
+- `lean-lelamp.json`（0.9225kg 无配重）/ `lean-lelamp-ballast.json`（1.4225kg，500g @ world z5mm，位置待核⑨）；
+- `lean-verify.md`：lean-FK vs MuJoCo，203 poses × 2 变体，max 误差 0.0017mm PASS；
+- 部署用 ballast 版，经 `LAMP_LEAN_JSON` 覆盖 cog.rs 内嵌 JSON（P1-b 补丁）；
+- homing=0 / angle_zero=0 为仿真约定，上机⑧后重测平移。
+
+重生成：`/tmp/lelamp-sim-venv/bin/python product/calibration/gen_lean_json.py`（原地覆盖）。
 
 ## 上机验证流程（wrist band ⑧）
 1. 空载（头部拆下或支撑）逐关节单动：±100 归一化指令 → 观察实际方向与角度；

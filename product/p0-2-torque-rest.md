@@ -4,6 +4,12 @@
 timestep 0.01s · 接触全开 · **全部工况穿透 pen=0** ·
 可复现脚本与结果 JSON：`brain-sim/analysis/`。
 
+> **2026-11-27 修正**：本文 CoG 读数受 MuJoCo `body_subtreemass` 过期 bug 影响，
+> xy 全部被缩放 0.8078（偏乐观）。修正值与翻转结论见 **`p0-2-cog-correction.md`**：
+> 500g 配重必配；rest0 释放无配重时倒；「230g 头倒」是假象；45/65 门限作废。
+> §3–§7 的 CoG/margin 数值为 P0 历史读数，勿再引用；力矩（§1–§2）、仿射映射（§0）、
+> rest0 姿态选择（§4）仍有效；§9 补丁清单由修正文档 §8 取代。
+
 ## 0. 前提修正：CSV 是归一化值，不是角度（待核① 关闭）
 
 LeLamp recordings CSV = LeRobot **RANGE_M100_100 归一化（−100..100）**，
@@ -130,6 +136,10 @@ HAL 机型保留 staged。500g 配重下 linear 全程裕量 ≈+33、staged ≈
 避免电池承担长时间保持电流。
 
 ## 9. fork P1 补丁清单（body.rs，隔离补丁，不动 upstream 语义）
+
+> 本节已被 `p0-2-cog-correction.md` §8 取代：45/65 门限作废（口径错误）；
+> fold-order 与 rest-release 补丁取消；新清单 = LAMP_LEAN_JSON / LAMP_CLIP_MM=78 /
+> LAMP_LOOK_MM=72 / LAMP_FOLD_BOUND_MM=78。以下保留为 P0 历史记录。
 
 1. fold CoG 门 22 → 环境变量 **`LAMP_FOLD_COG_GATE_MM`**（lelamp：45 带配重 / 65 不带）。
 2. `fold_plan` → lelamp 用 **linear**（HAL 保留 staged）。
