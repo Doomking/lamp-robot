@@ -1,9 +1,12 @@
 # voice — 中文人格 + 语音路线（决策中）
 
-## 人格
-- 载体 = 纯文本 `lampOS/deploy/character/lamp.txt`（经 instruction_file 注入，部署到 /etc/lampOS/voice/instruction.txt）。
-- ⚠️ 上游第一条规则硬编码 **"Always speak English, whatever language you hear"** → 中文化必须移除。
-- 中文人格在本目录重写，经部署脚本下发；自有技能放 `lampOS/skills/`（SKILL.md + skill.toml），用 `lampOS/deploy/sync-skills.sh` 部署（默认 dry-run，--apply 生效，原子改名热加载，永不删用户技能）。
+## 人格（P1-d 已交）
+- **中文人格 = `lamp-zh.txt`（本目录，名字「小灯」）**：部署到 `/etc/lampOS/voice/instruction.txt`，并在 voice provider.json 加 `"instruction_file"` 字段指向它（read_private ≤16KiB UTF-8）。产品 `deploy/product/settings/voice-provider.json` 原无此字段 → fork 部署时添加。
+- 英文规则有**两处**：built-in CHAT_INSTRUCTION / CAMERA_CHAT_INSTRUCTION（config.rs，仅 instruction_file 未配置时兜底）+ shipped `lamp.txt` 首条 "Always speak English"。instruction_file 覆盖后两者均不生效，**无需改上游文件**。
+- **上游已有中文语言层（#4473）**：`/etc/lampOS/setup/language` 写 `zh` → STT 语言、ElevenLabs `eleven_flash_v2_5` 中文音色、英文-only 门跟随；character 不含 "Always speak English" 时自动追加中文规则（与 lamp-zh.txt 一致无冲突）。**部署两者都要**：language=zh + instruction_file。
+- **中文技能 `skills-zh/`（3 个）直接拷贝部署 + off 状态文件关上游对应**，不走 sync-skills（它只同步 PRODUCT_SKILLS、永不读写用户文件夹；rest-your-eyes-zh 是 core 本就不能 install）。详见 `skills-zh/README.md`。
+- **look 开头中文补丁（speak_up.rs，env 门控）**：上游 asks_to_look 按 is_alphabetic 分词（中文"我看看"=一个词）且结束符仅 ASCII → 中文 look 开头双重失败，opening 被当普通回答读出（#1712 机制）。fork 补丁 `LAMP_LOOK_PHRASES="我看看|让我看看|我看一下"` 前缀匹配 + CJK 结束符；unset/空 = V1 逐字节不变。部署见 `../deploy/lamp-voice.env.example`。
+- **中文 care-lines 待写（⑫）**：上游 shipped 英文兜底（`LAMP_CARE_LINES_FILE` / `/etc/lampOS/voice/care-lines.json`）；安全相关台词需人工审校，不机翻。
 
 ## 路线（lampOS/crates/voice/src/coordinator/second.rs）
 - `LAMP_VOICE_ROUTE` 缺省/`gemini` = Gemini Live（默认）；`second` = 产品三段式 Deepgram STT → DeepSeek LLM → ElevenLabs TTS（需 LAMP_VOICE_SECOND_CONFIG）。合法值仅 gemini|second。
@@ -29,4 +32,4 @@
 - 结论：③ 国产 fork 的成本论据增强（flash 级 ~1 元/h 活跃对话）；原型期仍 ①/②。
 
 ## 待核（更新）
-② ElevenLabs/Gemini 中文音质盲听；③ Gemini 国内连通性；④ 豆包实时现价；qwen3.8-omni-flash-realtime 价格。
+② ElevenLabs/Gemini 中文音质盲听；③ Gemini 国内连通性；④ 豆包实时现价；qwen3.8-omni-flash-realtime 价格；⑪ near-call 中文名「小灯」（声学呼叫 rise dB/窗口 + STT 转写，language=zh 后待实测）；⑫ 中文 care-lines 人工审校。

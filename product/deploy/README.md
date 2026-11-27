@@ -1,4 +1,4 @@
-# product/deploy — fork 部署 env（P1-b）
+# product/deploy — fork 部署 env（P1-b body / P1-d voice）
 
 `lamp-body.env.example` 是 lamp-body 防倾倒门的 b500 部署值。四个开关全部
 env 门控、默认 unset = 上游 V1 行为逐字节不变（`lampOS/crates/body/src/cog.rs`
@@ -23,3 +23,15 @@ env 门控、默认 unset = 上游 V1 行为逐字节不变（`lampOS/crates/bod
 - 验证：`product/tools/lean-gate-validate/`（两跑：V1 默认 / 本 env）。
 - 实机 wrist H1/H2、轴 sign、homing 与配重质量/位置仍待 checklist ⑧⑨ 核定；
   核定后重跑 `product/calibration/gen_lean_json.py` 与 gate probe 再定门。
+
+## lamp-voice.env.example（P1-d）
+
+`LAMP_LOOK_PHRASES="我看看|让我看看|我看一下"`：speak_up.rs fork 补丁（env 门控，unset/空 = V1 逐字节不变）。上游 asks_to_look 按 is_alphabetic 分词（中文"我看看"=一个词）且结束符仅 ASCII → 中文 look 开头双重失败，opening 会被当普通回答读出（#1712 机制）；补丁按前缀匹配 + CJK 结束符（。！，；：、）补齐，| 分隔逐条 trim。
+
+配套（非 env，部署时一并写）：
+
+1. `/etc/lampOS/setup/language = zh`（上游 #4473 语言层：STT 语言、ElevenLabs flash_v2_5 中文音色、英文-only 门跟随）。
+2. provider.json 加 `"instruction_file": "/etc/lampOS/voice/instruction.txt"`，内容 = `product/voice/lamp-zh.txt`（中文人格全文，名字小灯；≤16KiB UTF-8）。未配置时上游兜底 built-in 英文 character（含 Always speak English）。
+3. 中文技能直接拷贝 + off 状态文件关上游对应：`product/voice/skills-zh/README.md`。
+4. `LAMP_HEAD_PET=on` / `LAMP_DESK_TIME=on` 产品 service 已默认，无需重复。
+5. 中文 care-lines（`LAMP_CARE_LINES_FILE` / `/etc/lampOS/voice/care-lines.json`）待写（⑫，安全台词人工审校）。

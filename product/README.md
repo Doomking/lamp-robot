@@ -2,9 +2,11 @@
 
 | 目录/文档 | 职责 |
 |---|---|
-| `battery/` | 市电为主 + 小电池：断电检测 → 线性折叠 rest0 → 保持 T_hold → 释放 → 休眠。V2 无任何断电检测，本模块全净新增。 |
+| `battery/` | 市电为主 + 小电池：断电检测 → 线性折叠 rest0 → 保持 T_hold → 释放 → 休眠。V2 无任何断电检测，本模块全净新增。battery_daemon.py 骨架已交（P1-d，sim 全绿；硬件待⑩）。 |
 | `calibration/` | 逐灯实测配置：BODY_POSES（body 无它拒启动）、zone.env、lean/CoG JSON 重生成；含 P0-② 定稿的归一化→模型仿射映射与 rest0。 |
-| `voice/` | 中文人格 + 语音路线（原型 ①Gemini/②三段式 own-keys，③国产 fork 放 P3）+ own-keys；含 P0-④ 价格调研。 |
+| `voice/` | 中文人格 + 语音路线（原型 ①Gemini/②三段式 own-keys，③国产 fork 放 P3）+ own-keys；含 P0-④ 价格调研。P1-d 已交：lamp-zh.txt + skills-zh/（3 技能）+ look 补丁部署说明。 |
 | `brain-sim/` | 本地 Python 仿真（源自 LeLamp 工作区 brain/），零硬件验证运动包络/折叠/LED 效果。运行：`/tmp/lelamp-sim-venv/bin/python product/brain-sim/demo.py`。`analysis/` = P0-② 可复现脚本与结果。 |
 | `p0-2-torque-rest.md` | **P0-② 定稿**：力矩/伸距/静息/释放/折叠/配重仿真全量结果 + fork P1 补丁清单。 |
 | `integration-checklist.md` | **P0-①**：逐层复用/自写边界 + 接缝决策 + 验证清单。 |
+| `hardware-spec-head-a.md` | **P1-e**：头部 A 方案制造规格（3mf 改动范围/环槽/UVC 凸台/匀光板/质量预算/配重安装位/验证清单/BOM 估算）。 |
+| `p0-2-cog-correction.md` | **P0-② 修正（权威数值）**：mj_setConst 质量/CoG 修正；门限 78/72/78 推导、b500 rest0/释放/折叠全量重算。 |

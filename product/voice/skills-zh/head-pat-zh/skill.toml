@@ -1,0 +1,61 @@
+# 摸头（中文替换版，对应上游 head-pat）。门控与上游逐条一致，只把固定台词
+# 换成中文。上游 head-pat 部署时关掉（enabled=false + state off，见 README）。
+# 摸头后的底座开心扭动是上游 head-pat-wiggle（无台词），保留不动。
+# 依 lamp-skills schema（lampOS/docs/skills.md "The schema, as lamp-skills reads it"）。
+needs = ["voice"]
+kind = "installable"
+version = "1.0.0"
+
+[permissions]
+topics = ["controls/pet", "voice/state", "expression/state", "onboarding/pending"]
+speak = true
+
+[trigger]
+topic = "controls/pet"
+field = "ended"
+equals = false            # 摸头进行中：Controls 每秒约十次，直到结束
+rearm = "ends"            # 一次摸头一次；被挡下的机会（说话/睡着/设置）作废，不补说
+cooldown = "10s"          # 10 秒内最多一次
+
+[[while]]                 # 听/想/说时及其后 3 秒内不说
+topic = "voice/state"
+field = "state"
+equals = "resting"
+for = "3s"
+
+[[while]]                 # 睡着不说，摸醒的那次也不说
+topic = "expression/state"
+field = "asleep"
+not_equals = true
+for = "5s"
+
+[[while]]                 # 设置邀请挂起时不说
+topic = "onboarding/pending"
+field = "invitations"
+equals = []
+unknown = "holds"
+
+[[while]]                 # 设置 walkthrough 期间不说
+topic = "onboarding/pending"
+field = "walk"
+equals = false
+unknown = "holds"
+
+[quiet]                   # 22:00–07:00 及时间未知时静默
+from = "22:00"
+to = "07:00"
+
+[ask]
+policy = "nudge"
+
+# 中文固定台词，随机一条，照原文说（默认）。2–16 条，可自由增改。
+[[do]]
+say = { text = [
+  "嗯，好舒服。",
+  "噢，我喜欢这样。",
+  "嘿嘿，有点痒。",
+  "哎呀，谢谢你。",
+  "这样真好。",
+  "嗯……再来一下嘛。",
+  "噢，你也跟我打招呼呀。",
+], priority = 8, expires = "3s" }   # 即时反应：第一秒的安静就说，否则不说，绝不迟到

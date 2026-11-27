@@ -1,0 +1,84 @@
+# 让眼睛歇歇（中文替换版，对应上游 rest-your-eyes）。触发/门控/预算/stop 与上游
+# 一致，say 注记改中文。上游 rest-your-eyes 部署时关掉（见 README）。
+# kind=core：{sitting} 槽只对 core 技能填充（docs/skills.md #7694）；本技能经
+# 直接拷贝部署（不在 build PRODUCT_SKILLS 里，sync-skills/install 不会碰它）。
+# [stop] 是 wellbeing 组共享函数，about/when 保持上游英文原文（组内第一个文件夹
+# 说了算，避免共享描述分叉）；只有 say 注记中文化。
+needs = ["eyes", "body", "light", "voice"]
+kind = "core"
+version = "1.0.0"
+most_a_day = 4              # 本地午夜起算，一天最多四次
+
+[permissions]
+speak = true
+topics = ["humans/faces/tracked", "voice/state", "room/activity"]
+body = true
+light = true
+
+[trigger]
+topic = "humans/faces/tracked"
+when = "present"          # 脸持续在
+near = 0.14               # 在桌前
+for = "45m"
+gap = "2m"                # 看别处/探出画面不算结束
+cooldown = "60m"          # 一直在就每小时一次；到点在说话，就说完后第一张脸
+
+[[while]]                 # 灯自己 30 秒没说话
+topic = "voice/state"
+field = "state"
+not_equals = "speaking"
+for = "30s"
+
+[[while]]                 # 不在对话中间
+topic = "voice/state"
+field = "state"
+equals = "resting"
+for = "5s"
+
+[[while]]                 # 低头读写时不说，等抬头；无 room/activity 时照常
+topic = "room/activity"
+field = "state"
+not_equals = "head_down"
+unknown = "holds"
+
+[[while]]                 # 坐的是同一个人：eyes 的 sitting_s 也满 45 分钟
+topic = "room/activity"
+field = "sitting_s"
+above = 2699
+unknown = "holds"
+
+[active]                  # 白天
+from = "09:00"
+to = "20:00"
+
+[quiet]                   # 夜里不说
+from = "22:00"
+to = "08:00"
+
+[budget]                  # wellbeing 组每小时一次（与上游共享组名 → [stop] 可共享）
+group = "wellbeing"
+per_hour = 1
+
+[rest]                    # 连续两次没人理会，歇到明早
+after_ignored = 2
+
+[stop]                    # 共享函数，about/when 与上游逐字一致
+tool = "wellbeing_nudges"
+kind = "eyes"
+about = "When someone asks you to stop a wellbeing nudge, the lamp's short hints after a long sitting (a slow blue glow for water, a tilt to rest the eyes, a turn to stand up, an evening droop): snooze it until tomorrow morning, turn it off until they ask again, or on again. all = true for 'the nudges' with no kind named; leave both out for 'that one', the last. Never a reminder they set ('stop reminding me to drink water'): that is cancel_reminder."
+when = "When asked to snooze, turn off or on again the lamp's wellbeing nudges (water, eyes, stand up, a break, a meal, sit back, wind down), or told they just had a drink. Not for reminders: cancel_reminder."
+
+[ask]
+policy = "nudge"
+
+[[do]]
+body = { gesture = "curious" }      # 小歪头（3 秒）
+light = { dim = 1 }                 # 歪头时灯光柔一档，随后复原
+say = "{sitting} 他盯着屏幕看了好一阵了。用一句轻松短话，建议让眼睛歇一会儿，也许看看远处。"
+
+# LAMP_NUDGES_PRESENT=on 时（默认关）：wellbeing 组每小时两次、间隔至少 30 分钟。
+[present.budget]
+group = "wellbeing"
+per_hour = 2
+gap = "30m"
+give_back_unsaid = true

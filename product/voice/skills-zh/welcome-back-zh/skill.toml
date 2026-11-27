@@ -1,0 +1,45 @@
+# 欢迎回来（中文替换版，对应上游 welcome-back）。基础触发/门控/ask 与上游一致，
+# say 注记改中文。上游 welcome-back 部署时关掉（见 README）。
+# 简化：不带上游 [present]（LAMP_NUDGES_PRESENT 晨间首次问候变体）——
+# 晨间问候仍由上游 bedtime-morning 负责，yields_to 保留。
+needs = ["eyes", "voice", "body", "light"]
+kind = "installable"
+version = "1.0.0"
+
+[permissions]
+topics = ["humans/faces/tracked", "voice/state"]
+speak = true
+light = true
+body = true
+who = true                # 注记里告诉它谁在灯前：熟脸的名字，常来的更暖一度
+
+[[trigger]]
+topic = "humans/faces/tracked"
+when = "appears"            # 原本没脸的地方出现一张脸
+near = 0.14                 # 在桌前，不是房间另一头
+absent_for = "5m"           # 至少五分钟没人后才算
+for = "3s"                  # 持续三秒不断
+gap = "3s"                  # 低头看键盘不算结束
+wait = "60s"                # 说话的房间：保留一分钟，两个条件都满足才取
+cooldown = "20m"
+yields_to = { skill = "bedtime-morning", trigger = "morning" }
+
+[[while]]                   # 5 秒没听到也没说：房间自己的谈话 1–4 秒就过
+topic = "voice/state"
+field = "state"
+equals = "resting"
+for = "5s"
+
+[[while]]                   # 灯自己 30 秒没说话：不跟刚聊过的人说"欢迎回来"
+topic = "voice/state"
+field = "state"
+not_equals = "speaking"
+for = "30s"
+
+[ask]                       # 灯主动发起的都先问 Policy；这声问候即使 LAMP_SKILLS_ASK=skip 也问
+policy = "hello"
+
+[[do]]
+body = { look_at = "face" }
+light = "warm_glow"
+say = { note = "他回到书桌前了。只打一声招呼，知道名字就带上名字，一句短话：别的都不说。", expires = "60s" }

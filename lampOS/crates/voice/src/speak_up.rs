@@ -13,6 +13,7 @@ use lamp_bus::{Bus, Message};
 use lamp_msgs::{FamiliarLevel, MOOD_STATE_TTL_US, MoodState};
 use std::{
     path::PathBuf,
+    sync::LazyLock,
     time::{Duration, SystemTime},
 };
 
@@ -32,6 +33,28 @@ pub const LOOK_FULL_NOTE: &str = "(You are looking now, and this is what your ey
 /// the story it had been cut off in, so this one says that is over.
 pub const ASK_AGAIN_NOTE: &str = "(The person just cut in and you could not make out what they said: it was misheard. What you were saying before is over: do not go on with it, do not finish it, do not sum it up, and do not answer what was misheard. Say only one word, in the language of the conversation, as a question: \"Sorry?\" Then stop and listen.)";
 pub const NO_LOOK_NOTE: &str = "(You tried to look, but your eye is shut just now and you saw nothing: you could not see it. Tell them plainly, in a few light words, that you could not see it; never guess what it is or answer as if you had seen it.)";
+
+/// Fork (env-gated, default off): `LAMP_LOOK_PHRASES` adds opening phrases for
+/// a character that does not speak English. A Chinese "我看看。" is one
+/// alphabetic word to the tokenizer below, and its `。` is not a closing mark,
+/// so the English table alone never hears it (the lamp-robot zh character).
+/// `|`-separated; each is matched as a prefix of the opening, closed by the
+/// English marks plus their CJK forms (`。！，；：、`). A word after the phrase
+/// is something else, as #1712: "我看看这个。" is not a look. Unset or empty:
+/// V1 behaviour, byte for byte.
+pub const LOOK_PHRASES_ENV: &str = "LAMP_LOOK_PHRASES";
+
+static LOOK_PHRASES: LazyLock<Vec<String>> = LazyLock::new(|| {
+    std::env::var(LOOK_PHRASES_ENV)
+        .map(|v| {
+            v.split('|')
+                .map(str::trim)
+                .filter(|s| !s.is_empty())
+                .map(String::from)
+                .collect()
+        })
+        .unwrap_or_default()
+});
 
 /// Whether an answer that opens like this is the lamp saying it will look:
 /// its own words are how it asks for its eyes. Only "let me look" and its
@@ -62,7 +85,7 @@ pub fn asks_to_look(opening: &str) -> bool {
             .next()
             .is_some_and(|c| matches!(c, '.' | '!' | '…' | ',' | ';' | ':' | '—' | '–' | '-'))
     };
-    [
+    let said = [
         &["let", "me", "look"][..],
         &["let", "me", "take", "a", "look"][..],
         &["let", "me", "have", "a", "look"][..],
@@ -75,6 +98,23 @@ pub fn asks_to_look(opening: &str) -> bool {
                 .zip(phrase.iter())
                 .all(|((word, _), said)| word == said)
             && closes(&opening[words[phrase.len() - 1].1..])
+    });
+    said || asks_to_look_extra(&LOOK_PHRASES, opening)
+}
+
+/// The fork's extra look phrases ([`LOOK_PHRASES_ENV`]): a prefix of the
+/// opening, closed by the English marks plus their CJK forms. Pure in the
+/// phrase list so tests need no environment. An empty list is never a look.
+fn asks_to_look_extra(phrases: &[String], opening: &str) -> bool {
+    let opening = opening.trim_start();
+    phrases.iter().any(|phrase| {
+        opening.strip_prefix(phrase.as_str()).is_some_and(|rest| {
+            rest.trim_start().chars().next().is_some_and(|c| {
+                matches!(c,
+                    '.' | '!' | '…' | ',' | ';' | ':' | '—' | '–' | '-'
+                    | '。' | '！' | '，' | '；' | '：' | '、')
+            })
+        })
     })
 }
 
@@ -416,6 +456,35 @@ mod tests {
         ] {
             assert_eq!(asks_to_look(opening), asks, "{opening:?}");
         }
+    }
+
+    #[test]
+    fn fork_look_phrases_are_off_unless_set_and_close_like_english() {
+        // Default (env unset): the extra list is empty; Chinese never asks.
+        assert!(!asks_to_look_extra(&[], "我看看。"));
+        let phrases: Vec<String> = ["我看看", "让我看看", "我看一下"].map(String::from).to_vec();
+        for (opening, asks) in [
+            ("我看看。", true),
+            ("我看看！", true),
+            ("我看看，好吗？", true),
+            ("让我看看。", true),
+            ("我看一下…好的。", true),
+            ("我看看 — 好。", true),
+            // Not closed yet: more words may follow.
+            ("我看看", false),
+            ("让我看看", false),
+            // #1712: a word after it is something else, never a look.
+            ("我看看这个。", false),
+            ("我看看这是什么。", false),
+            ("让我看看你手里拿的。", false),
+            ("你看。", false),
+            ("", false),
+        ] {
+            assert_eq!(asks_to_look_extra(&phrases, opening), asks, "{opening:?}");
+        }
+        // The English table is unchanged with the fork list present.
+        assert!(asks_to_look("Let me look."));
+        assert!(!asks_to_look("Let me look that up."));
     }
 
     #[test]
