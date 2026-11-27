@@ -4433,7 +4433,12 @@ fn fold_plan(
         }
         at
     };
-    let bound = cog::off_axis_mm(start).max(cog::off_axis_mm(folded_at)) + FOLD_LEAN_SLACK;
+    // lamp-robot fork: LAMP_FOLD_BOUND_MM replaces the relative bound
+    // with an absolute one; the relative bound refuses a safe straight
+    // fold when the lamp was found leaning (product/p0-2-cog-correction.md).
+    let bound = cog::fold_bound_mm(
+        cog::off_axis_mm(start).max(cog::off_axis_mm(folded_at)) + FOLD_LEAN_SLACK,
+    );
     let lean = |corners: &[[f32; 5]]| -> f64 {
         let mut worst = 0.0f64;
         for pair in corners.windows(2) {
@@ -4489,9 +4494,18 @@ fn fold_plan(
         worst_in_turn = worst_in_turn.min(worst);
     }
     Some(Err(NoFold::Tips(format!(
-        "folding it from here takes its centre of gravity {:.0} mm off its base's axis, farther than found or folded ({:.0} mm)",
+        "folding it from here takes its centre of gravity {:.0} mm off its base's axis, farther than {} ({:.0} mm)",
         worst.min(worst_in_turn),
-        bound - FOLD_LEAN_SLACK
+        if cog::fold_bound_absolute() {
+            "the fold bound"
+        } else {
+            "found or folded"
+        },
+        if cog::fold_bound_absolute() {
+            bound
+        } else {
+            bound - FOLD_LEAN_SLACK
+        }
     ))))
 }
 
@@ -8481,7 +8495,7 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
             ];
             let (frame, mm) = cog::worst_frame(pose, clip.frames);
             let at = Some((clip.name, frame.try_into().unwrap_or(u16::MAX), mm as f32));
-            if mm > cog::CLIP_MM {
+            if mm > cog::clip_mm() {
                 playing = None;
                 report.tipping.refused += 1;
                 report.tipping.last_refused = at;
@@ -8494,7 +8508,7 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
                         },
                     );
                 }
-            } else if mm >= cog::CLIP_MM * cog::WARN_SHARE {
+            } else if mm >= cog::clip_mm() * cog::WARN_SHARE {
                 report.tipping.close += 1;
                 report.tipping.last_close = at;
             }
@@ -9186,9 +9200,9 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
             };
             let (from, to) = (by_id(written, arm_is), by_id(goals, arm_to));
             let ceiling = if gesturing || !upright {
-                cog::CLIP_MM
+                cog::clip_mm()
             } else {
-                cog::LOOK_MM
+                cog::look_mm()
             };
             let (cut, share) = cog::limit_lean_back(from, to, ceiling);
             if share < 1.0 {

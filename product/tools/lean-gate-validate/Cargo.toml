@@ -1,0 +1,14 @@
+[package]
+name = "lean-gate-validate"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+# P1-b: runs the fork's env-gated anti-tip rule (lampOS/crates/body/src/cog.rs)
+# against the P0-2 corrected numbers. Outside the lampOS workspace on purpose:
+# a small standalone crate, path deps into the workspace members.
+[dependencies]
+lamp-lean = { path = "../../../lampOS/crates/lean" }
+lamp-body = { path = "../../../lampOS/crates/body" }
+
+[workspace]

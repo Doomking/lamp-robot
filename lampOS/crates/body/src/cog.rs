@@ -33,6 +33,87 @@ pub const LOOK_MM: f64 = 16.0;
 /// V1 warns of a recording from this share of [`CLIP_MM`] up.
 pub const WARN_SHARE: f64 = 0.85;
 
+/// lamp-robot fork: the environment switches that re-point the anti-tip
+/// rule at this lamp's own body model and ceilings
+/// (product/p0-2-cog-correction.md). Unset, every gate is V1's, byte for
+/// byte; set but not a positive finite number is a panic, never a silent
+/// fall back to V1's.
+///
+/// `LAMP_LEAN_JSON`: a `lamp-lean` geometry JSON loaded in place of V1's
+/// built-in body model. Set but unreadable or invalid is a panic at first
+/// use.
+pub const LEAN_JSON_ENV: &str = "LAMP_LEAN_JSON";
+/// `LAMP_CLIP_MM`: the tip-over ceiling for recordings and commanded
+/// moves, mm, in place of [`CLIP_MM`].
+pub const CLIP_MM_ENV: &str = "LAMP_CLIP_MM";
+/// `LAMP_LOOK_MM`: the lean-back ceiling for what the lamp does by
+/// itself, mm, in place of [`LOOK_MM`].
+pub const LOOK_MM_ENV: &str = "LAMP_LOOK_MM";
+/// `LAMP_FOLD_BOUND_MM`: an absolute bound, mm, on how far a fold may
+/// take the centre of gravity off the axis, in place of the relative
+/// bound (the farther of found and folded, plus slack). The relative
+/// bound refuses a physically safe straight fold when the lamp was found
+/// leaning (product/p0-2-cog-correction.md, the fold gate).
+pub const FOLD_BOUND_ENV: &str = "LAMP_FOLD_BOUND_MM";
+
+/// A positive finite millimetre value of an environment switch, or
+/// `default` when unset. Set but not a positive finite number is a panic:
+/// a typo'd ceiling must not silently become V1's.
+fn mm_from(value: Option<&str>, default: f64, name: &str) -> f64 {
+    match value {
+        None => default,
+        Some(text) => text
+            .parse::<f64>()
+            .ok()
+            .filter(|mm| mm.is_finite() && *mm > 0.0)
+            .unwrap_or_else(|| panic!("{name}={text}: not a positive finite number")),
+    }
+}
+
+/// The ceiling [`CLIP_MM_ENV`] sets, or [`CLIP_MM`].
+pub fn clip_mm_from(value: Option<&str>) -> f64 {
+    mm_from(value, CLIP_MM, CLIP_MM_ENV)
+}
+
+/// The ceiling [`LOOK_MM_ENV`] sets, or [`LOOK_MM`].
+pub fn look_mm_from(value: Option<&str>) -> f64 {
+    mm_from(value, LOOK_MM, LOOK_MM_ENV)
+}
+
+/// The absolute fold bound [`FOLD_BOUND_ENV`] sets, or `None` for the
+/// relative bound.
+pub fn fold_bound_from(value: Option<&str>) -> Option<f64> {
+    value.map(|text| mm_from(Some(text), 0.0, FOLD_BOUND_ENV))
+}
+
+static CLIP_OVERRIDE: LazyLock<f64> =
+    LazyLock::new(|| clip_mm_from(std::env::var(CLIP_MM_ENV).ok().as_deref()));
+static LOOK_OVERRIDE: LazyLock<f64> =
+    LazyLock::new(|| look_mm_from(std::env::var(LOOK_MM_ENV).ok().as_deref()));
+static FOLD_BOUND: LazyLock<Option<f64>> =
+    LazyLock::new(|| fold_bound_from(std::env::var(FOLD_BOUND_ENV).ok().as_deref()));
+
+/// The tip-over ceiling in force: [`CLIP_MM_ENV`]'s, or [`CLIP_MM`].
+pub fn clip_mm() -> f64 {
+    *CLIP_OVERRIDE
+}
+
+/// The lean-back ceiling in force: [`LOOK_MM_ENV`]'s, or [`LOOK_MM`].
+pub fn look_mm() -> f64 {
+    *LOOK_OVERRIDE
+}
+
+/// The fold bound in force: [`FOLD_BOUND_ENV`]'s absolute bound, or
+/// `relative`, the relative bound the caller computed.
+pub fn fold_bound_mm(relative: f64) -> f64 {
+    FOLD_BOUND.unwrap_or(relative)
+}
+
+/// Whether the fold bound in force is an absolute one.
+pub fn fold_bound_absolute() -> bool {
+    FOLD_BOUND.is_some()
+}
+
 struct Body {
     model: Model,
     /// Base yaw's angle at V1's zero: the arm's own heading is x there.
@@ -40,10 +121,21 @@ struct Body {
 }
 
 static BODY: LazyLock<Body> = LazyLock::new(|| {
-    let geometry = Geometry::from_json(include_str!(
-        "../../../deploy/lamp-4ace/lean-first-software.json"
-    ))
-    .expect("V1's body model parses");
+    // lamp-robot fork: `LAMP_LEAN_JSON` loads this lamp's own body model
+    // in place of V1's. Set but unreadable or invalid is a panic, never a
+    // silent fall back to V1's masses. Unset, V1's built-in model.
+    let geometry = match std::env::var(LEAN_JSON_ENV) {
+        Ok(path) => {
+            let text = std::fs::read_to_string(&path)
+                .unwrap_or_else(|error| panic!("{LEAN_JSON_ENV}={path}: {error}"));
+            Geometry::from_json(&text)
+                .unwrap_or_else(|error| panic!("{LEAN_JSON_ENV}={path}: {error}"))
+        }
+        Err(_) => Geometry::from_json(include_str!(
+            "../../../deploy/lamp-4ace/lean-first-software.json"
+        ))
+        .expect("V1's body model parses"),
+    };
     let yaw_zero = geometry
         .links
         .iter()
@@ -402,5 +494,33 @@ mod tests {
         }
         let listed: Vec<_> = crate::energy::WHOLE_TRIM.to_vec();
         assert_eq!(listed, found);
+    }
+
+    /// lamp-robot fork: the environment switches default to V1's ceilings
+    /// and the relative fold bound, and refuse a value that is not a
+    /// positive finite number of millimetres.
+    #[test]
+    fn fork_overrides_default_to_v1_and_refuse_a_bad_value() {
+        assert_eq!(clip_mm_from(None), CLIP_MM);
+        assert_eq!(look_mm_from(None), LOOK_MM);
+        assert_eq!(fold_bound_from(None), None);
+        assert_eq!(clip_mm_from(Some("78")), 78.0);
+        assert_eq!(look_mm_from(Some("72")), 72.0);
+        assert_eq!(fold_bound_from(Some("78")), Some(78.0));
+        for bad in ["", "soon", "0", "-22", "nan", "inf"] {
+            for parse in [
+                clip_mm_from as fn(Option<&str>) -> f64,
+                look_mm_from as fn(Option<&str>) -> f64,
+            ] {
+                assert!(
+                    std::panic::catch_unwind(|| parse(Some(bad))).is_err(),
+                    "{bad}"
+                );
+            }
+            assert!(
+                std::panic::catch_unwind(|| fold_bound_from(Some(bad))).is_err(),
+                "{bad}"
+            );
+        }
     }
 }
