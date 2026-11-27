@@ -1,6 +1,6 @@
 """Run the self-written layer against the project's MuJoCo model + recordings.
 
-    /tmp/lelamp-sim-venv/bin/python brain/demo.py
+    /tmp/lelamp-sim-venv/bin/python product/brain-sim/demo.py
 
 No hardware, no API keys: MockVoice stands in for the realtime voice adapter.
 Renders a 6-frame montage to /tmp/lelamp_brain_demo.png.
@@ -14,8 +14,7 @@ sys.path.insert(0, str(HERE))
 from lamp import SimLamp
 from brain import Brain, MockVoice, Intent, Autonomy
 
-REPO = HERE.parent
-SIM = REPO / "simulation"
+SIM = HERE.parents[1] / "hardware" / "simulation"   # lamp-robot monorepo layout
 
 script = [
     (8.0,  Intent("emote", name="wake_up")),

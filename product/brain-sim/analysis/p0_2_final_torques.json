@@ -1,0 +1,112 @@
+{
+ "exported+50g": {
+  "torque_max_p50": {
+   "base_pitch": [
+    10.1,
+    4.8
+   ],
+   "elbow_pitch": [
+    7.0,
+    5.5
+   ],
+   "wrist_pitch": [
+    1.2,
+    1.1
+   ]
+  },
+  "reach_p50_max": [
+   128.0,
+   233.0
+  ],
+  "cog_min_margin_mm": 9.0,
+  "pen_frames": 0
+ },
+ "realistic-upper": {
+  "torque_max_p50": {
+   "base_pitch": [
+    6.3,
+    2.8
+   ],
+   "elbow_pitch": [
+    4.2,
+    3.2
+   ],
+   "wrist_pitch": [
+    0.3,
+    0.3
+   ]
+  },
+  "reach_p50_max": [
+   128.0,
+   233.0
+  ],
+  "cog_min_margin_mm": 40.3,
+  "pen_frames": 0
+ },
+ "realistic-lower": {
+  "torque_max_p50": {
+   "base_pitch": [
+    5.4,
+    2.4
+   ],
+   "elbow_pitch": [
+    3.6,
+    2.7
+   ],
+   "wrist_pitch": [
+    0.3,
+    0.3
+   ]
+  },
+  "reach_p50_max": [
+   128.0,
+   233.0
+  ],
+  "cog_min_margin_mm": 48.2,
+  "pen_frames": 0
+ },
+ "NEW-A-180g": {
+  "torque_max_p50": {
+   "base_pitch": [
+    10.3,
+    5.3
+   ],
+   "elbow_pitch": [
+    7.6,
+    6.0
+   ],
+   "wrist_pitch": [
+    1.5,
+    1.3
+   ]
+  },
+  "reach_p50_max": [
+   128.0,
+   233.0
+  ],
+  "cog_min_margin_mm": 7.9,
+  "pen_frames": 0
+ },
+ "NEW-A-230g": {
+  "torque_max_p50": {
+   "base_pitch": [
+    11.7,
+    6.3
+   ],
+   "elbow_pitch": [
+    8.8,
+    7.0
+   ],
+   "wrist_pitch": [
+    2.0,
+    1.7
+   ]
+  },
+  "reach_p50_max": [
+   128.0,
+   233.0
+  ],
+  "cog_min_margin_mm": -3.5,
+  "pen_frames": 0
+ }
+}

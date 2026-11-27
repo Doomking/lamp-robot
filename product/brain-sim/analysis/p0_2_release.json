@@ -1,0 +1,186 @@
+{
+ "total_mass_kg": 0.923,
+ "rest": [
+  {
+   "deg": [
+    -18,
+    14,
+    -45
+   ],
+   "head_z_mm": 193,
+   "cog_mm": 56.4,
+   "tip_margin_mm": 45.2,
+   "grav_kgcm": {
+    "base_pitch": 6.11,
+    "elbow_pitch": 6.56,
+    "wrist_pitch": 0.71
+   },
+   "pen": 0
+  },
+  {
+   "deg": [
+    -18,
+    14,
+    -35
+   ],
+   "head_z_mm": 193,
+   "cog_mm": 58.4,
+   "tip_margin_mm": 43.1,
+   "grav_kgcm": {
+    "base_pitch": 6.35,
+    "elbow_pitch": 6.8,
+    "wrist_pitch": 0.51
+   },
+   "pen": 0
+  },
+  {
+   "deg": [
+    -18,
+    14,
+    -25
+   ],
+   "head_z_mm": 193,
+   "cog_mm": 60.6,
+   "tip_margin_mm": 40.9,
+   "grav_kgcm": {
+    "base_pitch": 6.61,
+    "elbow_pitch": 7.05,
+    "wrist_pitch": 0.29
+   },
+   "pen": 0
+  },
+  {
+   "deg": [
+    -18,
+    14,
+    -15
+   ],
+   "head_z_mm": 193,
+   "cog_mm": 62.7,
+   "tip_margin_mm": 38.6,
+   "grav_kgcm": {
+    "base_pitch": 6.86,
+    "elbow_pitch": 7.31,
+    "wrist_pitch": 0.06
+   },
+   "pen": 0
+  },
+  {
+   "deg": [
+    -18,
+    14,
+    -5
+   ],
+   "head_z_mm": 193,
+   "cog_mm": 64.7,
+   "tip_margin_mm": 36.2,
+   "grav_kgcm": {
+    "base_pitch": 7.11,
+    "elbow_pitch": 7.55,
+    "wrist_pitch": 0.17
+   },
+   "pen": 0
+  }
+ ],
+ "release": {
+  "rest0_-18,14,-45": {
+   "head_drop_mm": 87.7,
+   "head_z_after_mm": 105.7,
+   "max_joint_drift_deg": 22.0,
+   "cog_after_mm": 89.5,
+   "cog_after_xy_mm": [
+    -81.7,
+    36.4
+   ],
+   "tip_margin_after_mm": 13.3,
+   "contacts_end": [
+    "scs215_v5|lamparm__wrist_head",
+    "world|diffuser"
+   ]
+  },
+  "rest1_-18,14,-35": {
+   "head_drop_mm": 79.0,
+   "head_z_after_mm": 114.4,
+   "max_joint_drift_deg": 21.2,
+   "cog_after_mm": 91.4,
+   "cog_after_xy_mm": [
+    -83.7,
+    36.6
+   ],
+   "tip_margin_after_mm": 11.3,
+   "contacts_end": [
+    "scs215_v5|lamparm__wrist_head",
+    "world|diffuser"
+   ]
+  },
+  "rest2_-18,14,-25": {
+   "head_drop_mm": 62.4,
+   "head_z_after_mm": 131.0,
+   "max_joint_drift_deg": 14.7,
+   "cog_after_mm": 81.3,
+   "cog_after_xy_mm": [
+    -74.1,
+    33.5
+   ],
+   "tip_margin_after_mm": 20.9,
+   "contacts_end": [
+    "scs215_v5|lamparm__wrist_head",
+    "world|diffuser"
+   ]
+  },
+  "idle_C2": {
+   "head_drop_mm": 377.0,
+   "head_z_after_mm": 121.7,
+   "max_joint_drift_deg": 70.7,
+   "cog_after_mm": 149.7,
+   "cog_after_xy_mm": [
+    -144.4,
+    39.4
+   ],
+   "tip_margin_after_mm": -49.4,
+   "contacts_end": [
+    "scs215_v5|lamparm__wrist_head",
+    "world|diffuser"
+   ]
+  },
+  "qpos0": {
+   "head_drop_mm": 163.4,
+   "head_z_after_mm": 131.5,
+   "max_joint_drift_deg": 32.3,
+   "cog_after_mm": 85.4,
+   "cog_after_xy_mm": [
+    -78.8,
+    32.8
+   ],
+   "tip_margin_after_mm": 16.2,
+   "contacts_end": [
+    "scs215_v5|lamparm__wrist_head",
+    "world|diffuser"
+   ]
+  }
+ },
+ "fold": {
+  "idle->rest0_linear": {
+   "min_tip_margin_mm": 7.4,
+   "max_pen": 0,
+   "max_hold_kgcm": 10.4
+  },
+  "idle->rest0_staged": {
+   "min_tip_margin_mm": -5.1,
+   "max_pen": 0,
+   "max_hold_kgcm": 11.8
+  },
+  "zero->rest0_linear": {
+   "min_tip_margin_mm": 45.2,
+   "max_pen": 0,
+   "max_hold_kgcm": 9.4
+  }
+ },
+ "ballast": {
+  "gate22": 1.44,
+  "gate40": 0.38,
+  "gate50": 0.12,
+  "cog_with_500g": 36.6,
+  "cog_with_1000g": 27.1
+ }
+}

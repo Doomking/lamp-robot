@@ -4,6 +4,12 @@
 本目录用可运行代码证明这条接缝成立：同一份 `Brain` 代码，今天跑在 MuJoCo 仿真上，
 硬件到货后换一行后端构造即可上机，上游仓库一个文件都不改。
 
+> **lamp-robot fork 注（2026-11-26）**：本目录骨架写于"复用 LeLamp 运动服务"假设下；
+> 整体方案已定为 **LeLamp 硬件 + lampOS V2 软件**（单总线主 = V2 body）。
+> 接缝契约（play/solid/paint/recordings/motion_seconds）仍然成立，但上机后端
+> 改为 V2 body API 适配器 + recordings 转换器（P1，见 `../integration-checklist.md`），
+> 不再并行运行 LeLamp AnimationService。§5 的 lelamp_runtime 上机路径仅作历史参考。
+
 ## 1. 接缝契约（与 lelamp_runtime 服务层一一对应）
 
 | brain 侧调用 | 上游等价物 | 语义 |
@@ -23,8 +29,8 @@
 
 **上游免费给的（不重写）：**
 - 机械：STL / URDF / MuJoCo XML、5×ST3215 总线舵机方案、双电源接线文档
-- 动作词汇：`recordings/*.csv`（30fps、角度制）。注意 `idle` 不是静止pose，
-  而是一段 ~60s 的"环顾"循环（最大偏离均值 63.6°）——"活着"的底噪上游已经录好了
+- 动作词汇：`recordings/*.csv`（30fps、LeRobot RANGE_M100_100 归一化 −100..100，**非角度制**）。注意 `idle` 不是静止pose，
+  而是一段 ~60s 的"环顾"循环（最大偏离均值 63.6 归一化单位）——"活着"的底噪上游已经录好了
 - 运动服务：AnimationService / MotorsService / RGBService（Pi 侧）
 - 安全文档：yaw ±90°、连续运转时限、双电源
 
@@ -43,6 +49,7 @@
   - `HardwareLamp`：AnimationService + RGBService(led_count=40) 的懒加载薄包装。
     **尚未上机验证**，接口与 SimLamp 完全同构
 - `demo.py`：无硬件、无 API key 的端到端演示 + 六帧 montage
+- `analysis/`：P0-② 力矩/静息/释放/折叠/配重仿真脚本 + 结果 JSON（可复现，见 `../p0-2-torque-rest.md`）
 
 **为什么零上游修改：** runtime `main.py` 的三个坑（硬编码英文 prompt、`sudo -u pi`、
 `RGBService(led_count=64)` 与实际 40 灯珠不符）都住在入口文件里；我们用自己的入口
@@ -58,8 +65,10 @@
    重新表达到新声明坐标系，qpos=0 时世界系几何与原版完全一致。
    功能判别已验证：j1 水平旋转、j2 俯仰、j3 肘、j4/j5 腕，底座全程不动。
 3. 模型关节/执行器名是 servo ID `"1".."5"`，不是 CSV 列名 → `SERVO_ID_MAP` 映射。
-4. CSV 角度与模型关节方向/范围不一致（如 elbow +83° 超出 j3 范围）→ 逐关节符号自拟合
-   + 范围 clamp；yaw/wrist_roll 另加文档 ±90° 限幅。
+4. CSV 是 LeRobot 归一化值（−100..100）而非角度 → **仿射映射** θ=θ_c+s·k·v
+   （k=span/200；pitch 取范围中点为零位 H1，elbow/wrist 取模型零位 H2；yaw/roll 1 单位=0.9°）
+   + 范围 clamp；yaw/wrist_roll 另加文档 ±90° 限幅。映射经 CAD 渲染视觉验证，
+   详见 `../p0-2-torque-rest.md`；旧"逐关节符号自拟合（角度制）"为错误前提，已作废。
 5. 灯罩 `diffuser_material` 默认灰塑料 → `mat_emission=1` + 颜色×亮度，仿真里才"看得见光"。
 
 ## 4. 运行
@@ -67,7 +76,7 @@
 ```bash
 python3 -m venv /tmp/lelamp-sim-venv
 /tmp/lelamp-sim-venv/bin/pip install mujoco numpy pillow
-/tmp/lelamp-sim-venv/bin/python brain/demo.py     # 36s 仿真 → /tmp/lelamp_brain_demo.png
+/tmp/lelamp-sim-venv/bin/python product/brain-sim/demo.py   # 仓库根目录运行；36s 仿真 → /tmp/lelamp_brain_demo.png
 ```
 
 demo 脚本：8s wake_up+暖白 → 15s nod+绿 → 21s happy_wiggle+橙 → 30s 自主 curious。

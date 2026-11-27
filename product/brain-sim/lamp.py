@@ -35,6 +35,19 @@ SERVO_ID_MAP = {"1": "base_yaw", "2": "base_pitch", "3": "elbow_pitch",
                 "4": "wrist_roll", "5": "wrist_pitch"}
 FPS = 30
 
+# CSV values are LeRobot RANGE_M100_100 normalized (-100..100), NOT degrees
+# (lelamp_runtime config_lelamp_follower.py: use_degrees=False). Affine map
+# theta = theta_c + s * k * v, verified against CAD renders in P0-2
+# (product/p0-2-torque-rest.md): qpos0 == CAD zero pose; idle frame 1682
+# reproduces the periscope idle from the demo videos.
+# NORM_SIGN: per-joint direction. NORM_HYP: 0 = range center is theta_c (H1),
+# 1 = model zero is theta_c (H2). yaw/roll: 1 normalized unit = 0.9 deg
+# (docs +-90 deg at +-100). wrist_pitch sign/HYP band (+-41 deg, ~14 deg
+# saturation at CSV extremes under H2) still to verify on real hardware.
+NORM_SIGN = {"base_yaw": 1, "base_pitch": 1, "elbow_pitch": -1,
+             "wrist_roll": 1, "wrist_pitch": -1}
+NORM_HYP = {"base_pitch": 0, "elbow_pitch": 1, "wrist_pitch": 1}
+
 
 def load_recodings(directory) -> dict:
     out = {}
@@ -129,7 +142,7 @@ def _reparent_base(robot_xml: str) -> str:
 
 
 class SimLamp:
-    """MuJoCo twin of the service-layer seam. Degrees in CSV -> rad in model."""
+    """MuJoCo twin of the service-layer seam. CSV normalized (-100..100) -> rad."""
 
     def __init__(self, sim_dir, recordings_dir, transition_s=1.5,
                  yaw_limit_deg=90.0, duty_budget_s=3600.0):
@@ -149,7 +162,8 @@ class SimLamp:
         self.duty_budget = duty_budget_s
         self.motion_seconds = 0.0
         self.resting = False
-        # CSV joint name -> (ctrl slot, qpos adr, range, sign)
+        # CSV joint name -> (ctrl slot, qpos adr, range, (theta_c, k))
+        # theta_rad = theta_c + k * v_norm   (see NORM_SIGN / NORM_HYP above)
         self.jmap = {}
         for i in range(self.m.njnt):
             sid = mujoco.mj_id2name(self.m, mujoco.mjtObj.mjOBJ_JOINT, i)
@@ -158,10 +172,13 @@ class SimLamp:
                 continue
             slot = mujoco.mj_name2id(self.m, mujoco.mjtObj.mjOBJ_ACTUATOR, sid)
             lo, hi = self.m.jnt_range[i]
-            deg = [f[name] for frames in self.rec.values() for f in frames]
-            fit = lambda s: sum(lo <= math.radians(s * v) <= hi for v in deg) / len(deg)
-            sign = 1 if fit(1) >= fit(-1) else -1
-            self.jmap[name] = (slot, self.m.jnt_qposadr[i], (lo, hi), sign)
+            s = NORM_SIGN[name]
+            if name in ("base_yaw", "wrist_roll"):
+                coef = (0.0, s * math.radians(0.9))
+            else:
+                theta_c = (lo + hi) / 2 if NORM_HYP[name] == 0 else 0.0
+                coef = (theta_c, s * (hi - lo) / 200.0)
+            self.jmap[name] = (slot, self.m.jnt_qposadr[i], (lo, hi), coef)
         assert set(self.jmap) == set(JOINTS), f"joint map incomplete: {self.jmap}"
         self.state = {j: 0.0 for j in JOINTS}
         self._name, self._frames, self._idx = "idle", self.rec["idle"], 0
@@ -224,11 +241,11 @@ class SimLamp:
             self.m.mat_rgba[self._mat][:3] = [v / 255.0 * glow for v in self.color]
 
     def _apply(self):
-        for j, (slot, adr, (lo, hi), sign) in self.jmap.items():
-            deg = self.state[j]
+        for j, (slot, adr, (lo, hi), (theta_c, k)) in self.jmap.items():
+            v = self.state[j]
             if j in ("base_yaw", "wrist_roll"):   # docs: yaw servos +-90 deg from center
-                deg = max(-self.yaw_limit, min(self.yaw_limit, deg))
-            rad = max(lo, min(hi, math.radians(sign * deg)))
+                v = max(-self.yaw_limit / 0.9, min(self.yaw_limit / 0.9, v))
+            rad = max(lo, min(hi, theta_c + k * v))
             self.d.ctrl[slot] = rad
 
 

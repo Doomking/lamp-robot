@@ -11,3 +11,32 @@ V2 body **无实测配置拒绝启动**：
 ## 参考
 - `lampOS/deploy/units/README.md` — 部分部署原则："Leave out what the lamp does not run. A part that is not there is not waited for."
 - 逐灯模板占位符：@NAME@ / @SERVO_DEVICE@ / @CAMERA_DEVICE@ / @FAST_CPUS@（部署时逐灯填；A733 大核 = 2×A76）。
+
+## 关节映射（P0-② 定稿，2026-11-26）
+LeLamp recordings CSV = LeRobot RANGE_M100_100 归一化（−100..100），**非角度制**
+（lelamp_runtime `config_lelamp_follower.py: use_degrees=False`）。
+仿射映射 θ = θ_c + s·k·v（模型角度）：yaw/roll θ = s·0.9°·v（±100 → ±90°）；
+pitch/elbow/wrist k = span/200，θ_c = 范围中点（H1）或模型零位（H2）。
+
+| 关节 | s | 假设 | 模型范围(°) | θ_c(°) |
+|---|---|---|---|---|
+| base_yaw | +1 | — | [−287.7, 72.3] | 0 |
+| base_pitch | +1 | H1 | [−62.1, 117.9] | 27.9 |
+| elbow_pitch | −1 | H2 | [−161.6, 18.4] | 0 |
+| wrist_roll | +1 | — | [−217, 143] | 0 |
+| wrist_pitch | −1 | H2 | [−48.9, 131.1] | 0 |
+
+qpos0 = CAD 零位已视觉验证（idle 帧 1682 → 潜望镜 idle，头部 z≈499mm）。
+**wrist_pitch 存在 ±41° 备选带**（H1 vs H2 / 符号）：H2 下 CSV 极值（v>54.3）有 ~14°
+范围饱和（7.2% 帧），H1 备选无饱和；仿真力矩影响 <1 kg·cm、CoG <8%，上机必须实测裁决（⑧）。
+
+## rest0（P0-② 仿真选定）
+模型角度 (pitch, elbow, wrist) = (−18°, +14°, −45°)，yaw=roll=0。
+CSV 归一化等价 ≈ **(0, −51.0, −15.6, 0, +50.0)**。
+头部 z 193mm、CoG 56.4mm、倾倒裕量 45.2mm、重力保持 6.11/6.56/0.71 kg·cm。
+→ 填入 BODY_POSES rest；**正常静息保持力矩，不 release**（详见 ../p0-2-torque-rest.md）。
+
+## 上机验证流程（wrist band ⑧）
+1. 空载（头部拆下或支撑）逐关节单动：±100 归一化指令 → 观察实际方向与角度；
+2. 对照上表确认 s 与 θ_c；wrist_pitch 重点核对 rest0 指令（CSV +50）是否低头 45°；
+3. 确认后更新 lamp.env BODY_POSES + 本表；再跑 idle + 单 emote 全幅验证。
